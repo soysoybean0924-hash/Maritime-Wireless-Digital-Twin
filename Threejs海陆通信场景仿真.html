@@ -59,6 +59,93 @@
     #info-panel .metric-value.warn { color: #ff9800; }
     #info-panel .metric-value.bad  { color: #f44336; }
 
+    /* 运营告警面板 */
+    #ops-panel {
+      position: absolute;
+      top: 300px;
+      left: 20px;
+      width: 300px;
+      background: rgba(10, 18, 24, 0.84);
+      color: #fff;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 193, 7, 0.35);
+      pointer-events: auto;
+      backdrop-filter: blur(10px);
+      font-size: 12px;
+    }
+    #ops-panel h3 {
+      font-size: 14px;
+      color: #ffc107;
+      margin: 0 0 8px 0;
+    }
+    #ops-panel .ops-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 4px 0;
+      align-items: center;
+    }
+    #ops-panel .ops-label { color: #90a4ae; }
+    #ops-panel .ops-value {
+      color: #e0f7fa;
+      text-align: right;
+      font-family: 'Consolas', monospace;
+    }
+    #ops-panel .ops-message {
+      margin: 8px 0;
+      color: #eceff1;
+      line-height: 1.45;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      padding-top: 8px;
+    }
+    #ops-panel .ops-action {
+      color: #ffcc80;
+      line-height: 1.4;
+    }
+    #ops-panel select,
+    #ops-panel button {
+      border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      padding: 6px 8px;
+      font-family: inherit;
+      font-size: 12px;
+    }
+    #ops-panel select { width: 100%; margin: 6px 0; }
+    #ops-panel option { color: #111; }
+    #ops-panel button {
+      cursor: pointer;
+      margin-right: 6px;
+    }
+    #ops-panel button.primary {
+      background: rgba(255, 193, 7, 0.22);
+      border-color: rgba(255, 193, 7, 0.55);
+    }
+    #ops-panel.warning { border-color: rgba(255, 152, 0, 0.8); box-shadow: 0 0 18px rgba(255, 152, 0, 0.16); }
+    #ops-panel.danger { border-color: rgba(244, 67, 54, 0.9); box-shadow: 0 0 22px rgba(244, 67, 54, 0.22); }
+
+    #scene-alert {
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      min-width: 360px;
+      max-width: 680px;
+      background: rgba(5, 16, 24, 0.78);
+      border: 1px solid rgba(129, 212, 250, 0.26);
+      border-radius: 20px;
+      color: #e1f5fe;
+      padding: 8px 16px;
+      text-align: center;
+      font-size: 13px;
+      pointer-events: none;
+      backdrop-filter: blur(10px);
+    }
+    #scene-alert.warning { border-color: rgba(255, 152, 0, 0.85); color: #ffecb3; }
+    #scene-alert.danger { border-color: rgba(244, 67, 54, 0.9); color: #ffcdd2; animation: pulse 0.9s ease-in-out infinite; }
+
     /* 信号强度条形图 */
     #signal-bar-container {
       width: 100%;
@@ -269,6 +356,32 @@
       <span class="metric-label">传播模型</span>
       <span class="metric-value" id="model-value" style="font-size:11px;">双线地面反射</span>
     </div>
+  </div>
+
+  <div id="scene-alert">运营态势：岸边基站覆盖稳定，持续监测蒸发波导与船迹边界。</div>
+
+  <!-- 异常天气与覆盖运营告警面板 -->
+  <div id="ops-panel">
+    <h3>⚠ 覆盖运营告警</h3>
+    <select id="incident-select" aria-label="选择异常天气或事故情景">
+      <option value="normal">正常巡航 / 持续监测</option>
+      <option value="duct-boost">周期性蒸发波导 / 覆盖变远</option>
+      <option value="duct-collapse">强风干燥 / 波导消散</option>
+      <option value="storm-front">突发暴雨海雾 / 覆盖波动</option>
+      <option value="base-fault">岸边基站故障 / 覆盖中断</option>
+      <option value="leo-handover">船迹越界 / 低轨卫星补盲</option>
+    </select>
+    <div>
+      <button id="apply-incident" class="primary" type="button">触发情景</button>
+      <button id="clear-incident" type="button">恢复监测</button>
+    </div>
+    <div class="ops-row"><span class="ops-label">运营状态</span><span class="ops-value" id="ops-status">稳定</span></div>
+    <div class="ops-row"><span class="ops-label">船迹水平距离</span><span class="ops-value" id="ops-track-range">-- km</span></div>
+    <div class="ops-row"><span class="ops-label">岸站有效覆盖</span><span class="ops-value" id="ops-coverage-range">-- km</span></div>
+    <div class="ops-row"><span class="ops-label">蒸发波导横向</span><span class="ops-value" id="ops-duct-range">-- km</span></div>
+    <div class="ops-row"><span class="ops-label">低轨卫星备份</span><span class="ops-value" id="ops-leo-status">待命</span></div>
+    <div class="ops-message" id="ops-message">当前网络覆盖满足运营商服务要求，建议继续监测气象剖面与船迹距离。</div>
+    <div class="ops-action" id="ops-action">处置建议：保持岸站主链路，记录波导高度和链路裕量。</div>
   </div>
 
   <!-- 基站工程参数面板 -->
@@ -898,6 +1011,165 @@
       positionX: -20,
       positionY: 1.6 + 17.5,
       positionZ: -22,
+    };
+
+    // ============================================================
+    // 覆盖运营异常与气象告警模型
+    // ============================================================
+    const OPERATION_SCALE_KM_PER_SCENE_M = 2.6;
+    let activeIncident = 'normal';
+    let leoBackupManual = false;
+
+    const incidentProfiles = {
+      normal: {
+        label: '持续监测',
+        severity: 'normal',
+        extraLoss: 0,
+        coverageFactor: 1,
+        message: '当前网络覆盖满足运营商服务要求，建议继续监测气象剖面与船迹距离。',
+        action: '保持岸站主链路，记录波导高度和链路裕量。',
+      },
+      'duct-boost': {
+        label: '周期性波导增强',
+        severity: 'warning',
+        extraLoss: -3,
+        coverageFactor: 1.18,
+        env: { airTemp: 22, seaTemp: 29, rh: 95, windSpeed: 2 },
+        message: '蒸发波导增强会把岸边基站覆盖拉远，可短时支撑更远船迹，但覆盖边界会随气象周期漂移。',
+        action: '扩大远海船迹监测范围，同时标注波导消散后的回退覆盖边界。',
+      },
+      'duct-collapse': {
+        label: '波导消散',
+        severity: 'warning',
+        extraLoss: 8,
+        coverageFactor: 0.72,
+        env: { airTemp: 30, seaTemp: 24, rh: 50, windSpeed: 14 },
+        message: '强风和干燥空气削弱蒸发波导，岸站覆盖从超视距回落到常规近岸范围。',
+        action: '提前压缩服务承诺范围，通知远海船舶准备低轨卫星或改道。',
+      },
+      'storm-front': {
+        label: '突发暴雨海雾',
+        severity: 'warning',
+        extraLoss: 12,
+        coverageFactor: 0.82,
+        env: { airTemp: 27, seaTemp: 28, rh: 94, windSpeed: 12 },
+        message: '暴雨、海雾与强海况会增加散射和海面多径波动，覆盖边缘船舶最先出现业务抖动。',
+        action: '临时提升告警等级，优先保障低速控制信令并准备卫星补盲。',
+      },
+      'base-fault': {
+        label: '岸站主链路故障',
+        severity: 'critical',
+        extraLoss: 28,
+        coverageFactor: 0.42,
+        message: '岸边基站天线、电源或传输异常会造成覆盖空洞，海上接收机存在失联风险。',
+        action: '派发岸站抢修工单，立即启用低轨卫星备份链路。',
+      },
+      'leo-handover': {
+        label: '船迹越界补盲',
+        severity: 'warning',
+        extraLoss: 5,
+        coverageFactor: 0.92,
+        forceLeo: true,
+        message: '船迹接近或越过岸站实测覆盖边界，需把低轨卫星纳入业务连续性预案。',
+        action: '触发低轨卫星备份，保持岸站链路作为可用时的低成本主链路。',
+      },
+    };
+
+    const opsEls = {
+      panel: document.getElementById('ops-panel'),
+      sceneAlert: document.getElementById('scene-alert'),
+      select: document.getElementById('incident-select'),
+      apply: document.getElementById('apply-incident'),
+      clear: document.getElementById('clear-incident'),
+      status: document.getElementById('ops-status'),
+      trackRange: document.getElementById('ops-track-range'),
+      coverageRange: document.getElementById('ops-coverage-range'),
+      ductRange: document.getElementById('ops-duct-range'),
+      leoStatus: document.getElementById('ops-leo-status'),
+      message: document.getElementById('ops-message'),
+      action: document.getElementById('ops-action'),
+    };
+
+    const recomputeAfterIncidentChange = () => {
+      updateDuctVisualization();
+      updateDuctShell();
+      updatePEField();
+      updateRayFan();
+      updateAnalysisCharts();
+    };
+
+    const setIncident = (type) => {
+      activeIncident = type;
+      const profile = incidentProfiles[type] || incidentProfiles.normal;
+      leoBackupManual = !!profile.forceLeo;
+      if (profile.env) ductModel.setEnvironment(profile.env);
+      recomputeAfterIncidentChange();
+      console.log(`⚠ 覆盖运营情景: ${profile.label}`);
+    };
+
+    opsEls.apply.addEventListener('click', () => setIncident(opsEls.select.value));
+    opsEls.clear.addEventListener('click', () => {
+      opsEls.select.value = 'normal';
+      activeIncident = 'normal';
+      leoBackupManual = false;
+      ductModel.setEnvironment({ airTemp: 28, seaTemp: 25, rh: 75, windSpeed: 6 });
+      recomputeAfterIncidentChange();
+      console.log('✅ 覆盖运营情景已恢复为持续监测');
+    });
+
+    const computeOperationalCoverage = (sceneDistance, signalResult) => {
+      const profile = incidentProfiles[activeIncident] || incidentProfiles.normal;
+      const trackRangeKm = sceneDistance * OPERATION_SCALE_KM_PER_SCENE_M;
+      const hasDuct = ductModel.isTrapping && ductModel.ductHeight > 0.5;
+      const ductRangeKm = hasDuct
+        ? Math.min(320, 65 + ductModel.ductHeight * 6.5 + ductModel.ductStrength * 2.8)
+        : 0;
+      const baselineKm = 58 + Math.max(0, signalResult.sinr) * 1.1;
+      const effectiveCoverageKm = Math.max(
+        18,
+        (hasDuct ? Math.max(baselineKm, ductRangeKm) : baselineKm) * profile.coverageFactor
+      );
+      const boundaryRatio = trackRangeKm / Math.max(effectiveCoverageKm, 1);
+      const satBackupNeeded = profile.forceLeo || boundaryRatio > 0.92 || signalResult.rsrp < -100;
+      const nearBoundary = boundaryRatio > 0.78;
+      let severity = profile.severity;
+      if (boundaryRatio > 1.04 || signalResult.rsrp < -106) severity = 'critical';
+      else if (nearBoundary && severity === 'normal') severity = 'warning';
+      const status = severity === 'critical'
+        ? '告警'
+        : severity === 'warning'
+          ? '预警'
+          : '稳定';
+
+      const coverageText = hasDuct
+        ? `蒸发波导把岸边基站横向覆盖估计扩展到 ${ductRangeKm.toFixed(0)} km；当船迹逼近 ${effectiveCoverageKm.toFixed(0)} km 边界时，需要预置低轨卫星补盲。`
+        : `当前未形成稳定蒸发波导，岸站主要依赖常规近岸覆盖，船迹逼近 ${effectiveCoverageKm.toFixed(0)} km 时需提前切换备份。`;
+
+      return {
+        profile,
+        trackRangeKm,
+        ductRangeKm,
+        effectiveCoverageKm,
+        boundaryRatio,
+        satBackupNeeded,
+        severity,
+        status,
+        coverageText,
+      };
+    };
+
+    const applyOperationalImpact = (signalResult, sceneDistance) => {
+      const profile = incidentProfiles[activeIncident] || incidentProfiles.normal;
+      const coverage = computeOperationalCoverage(sceneDistance, signalResult);
+      const boundaryLoss = Math.max(0, coverage.boundaryRatio - 0.75) * 18;
+      const incidentLoss = profile.extraLoss + boundaryLoss;
+      signalResult.rsrp -= incidentLoss;
+      signalResult.sinr -= incidentLoss * 0.82;
+      signalResult.pathLoss += incidentLoss;
+      if (incidentLoss > 3) {
+        signalResult.modelName = `${signalResult.modelName} + 运营告警`;
+      }
+      return computeOperationalCoverage(sceneDistance, signalResult);
     };
 
     /**
@@ -2110,6 +2382,104 @@
       pulseParticles.push(pulse);
     }
 
+    // 覆盖运营可视化: 岸站覆盖边界、风险边界和低轨卫星备份链路
+    const opsVisGroup = new THREE.Group();
+    opsVisGroup.name = 'ops-coverage-warning';
+    scene.add(opsVisGroup);
+
+    const createCoverageCircle = (color, opacity, dashed = false) => {
+      const points = [];
+      for (let i = 0; i <= 160; i++) {
+        const a = (i / 160) * Math.PI * 2;
+        points.push(new THREE.Vector3(Math.cos(a), 0, Math.sin(a)));
+      }
+      const geo = new THREE.BufferGeometry().setFromPoints(points);
+      const mat = dashed
+        ? new THREE.LineDashedMaterial({ color, transparent: true, opacity, dashSize: 1.5, gapSize: 0.9, depthTest: true })
+        : new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthTest: true });
+      const line = new THREE.Line(geo, mat);
+      line.computeLineDistances();
+      line.position.set(baseStationConfig.positionX, SEA_LEVEL + 0.12, baseStationConfig.positionZ);
+      return line;
+    };
+
+    const effectiveCoverageRing = createCoverageCircle(0x4fc3f7, 0.55);
+    const ductCoverageRing = createCoverageCircle(0xffb300, 0.35, true);
+    const riskCoverageRing = createCoverageCircle(0xff1744, 0.18);
+    opsVisGroup.add(effectiveCoverageRing, ductCoverageRing, riskCoverageRing);
+
+    const leoBackupGroup = new THREE.Group();
+    leoBackupGroup.name = 'leo-satellite-backup';
+    scene.add(leoBackupGroup);
+
+    const satBody = new THREE.Mesh(
+      new THREE.BoxGeometry(1.8, 0.7, 1.0),
+      new THREE.MeshStandardMaterial({ color: 0xe0e0e0, roughness: 0.25, metalness: 0.8, emissive: 0x263238, emissiveIntensity: 0.25 })
+    );
+    leoBackupGroup.add(satBody);
+
+    const solarMat = new THREE.MeshStandardMaterial({ color: 0x1565c0, roughness: 0.2, metalness: 0.6, emissive: 0x0d47a1, emissiveIntensity: 0.25 });
+    const panelL = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.05, 0.85), solarMat);
+    panelL.position.x = -2.1;
+    const panelR = panelL.clone();
+    panelR.position.x = 2.1;
+    leoBackupGroup.add(panelL, panelR);
+
+    const satLabelDiv = document.createElement('div');
+    satLabelDiv.textContent = '🛰 低轨卫星备份';
+    satLabelDiv.style.cssText = 'color:#fff;font-size:12px;background:rgba(0,0,0,0.72);padding:3px 9px;border-radius:12px;white-space:nowrap;border:1px solid rgba(255,193,7,0.45);';
+    const satLabel = new CSS2DObject(satLabelDiv);
+    satLabel.position.set(0, 1.2, 0);
+    leoBackupGroup.add(satLabel);
+
+    const leoLinkGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+    const leoLinkMat = new THREE.LineBasicMaterial({ color: 0xffd54f, transparent: true, opacity: 0.75, depthTest: true });
+    const leoBackupLink = new THREE.Line(leoLinkGeo, leoLinkMat);
+    scene.add(leoBackupLink);
+
+    const updateOpsVisualization = (coverage, elapsed) => {
+      const sceneCoverageRadius = Math.max(8, coverage.effectiveCoverageKm / OPERATION_SCALE_KM_PER_SCENE_M);
+      const sceneDuctRadius = Math.max(0.01, coverage.ductRangeKm / OPERATION_SCALE_KM_PER_SCENE_M);
+      effectiveCoverageRing.scale.set(sceneCoverageRadius, 1, sceneCoverageRadius);
+      ductCoverageRing.scale.set(sceneDuctRadius, 1, sceneDuctRadius);
+      ductCoverageRing.visible = coverage.ductRangeKm > 1;
+      riskCoverageRing.scale.set(sceneCoverageRadius * 1.03, 1, sceneCoverageRadius * 1.03);
+      riskCoverageRing.material.opacity = coverage.severity === 'critical' ? 0.85 : coverage.severity === 'warning' ? 0.42 : 0.12;
+      riskCoverageRing.material.color.setHex(coverage.severity === 'critical' ? 0xff1744 : 0xff9800);
+
+      const satActive = coverage.satBackupNeeded || leoBackupManual;
+      leoBackupGroup.visible = satActive;
+      leoBackupLink.visible = satActive;
+      if (!satActive) return;
+
+      const orbitAngle = elapsed * 0.18;
+      const baseX = boatGroup.position.x + Math.cos(orbitAngle) * 18;
+      const baseZ = boatGroup.position.z + Math.sin(orbitAngle) * 18;
+      leoBackupGroup.position.set(baseX, 42 + Math.sin(elapsed * 0.7) * 2, baseZ);
+      leoBackupGroup.rotation.y = -orbitAngle;
+
+      const satWorld = new THREE.Vector3();
+      leoBackupGroup.getWorldPosition(satWorld);
+      const rxWorld = new THREE.Vector3();
+      receiverGroup.getWorldPosition(rxWorld);
+      leoBackupLink.geometry.setFromPoints([satWorld, rxWorld]);
+      leoBackupLink.geometry.computeBoundingSphere();
+      leoLinkMat.opacity = 0.45 + Math.sin(elapsed * 5) * 0.22;
+    };
+
+    const updateOpsPanel = (coverage) => {
+      opsEls.panel.className = coverage.severity === 'critical' ? 'danger' : coverage.severity === 'warning' ? 'warning' : '';
+      opsEls.sceneAlert.className = coverage.severity === 'critical' ? 'danger' : coverage.severity === 'warning' ? 'warning' : '';
+      opsEls.status.textContent = coverage.status;
+      opsEls.trackRange.textContent = `${coverage.trackRangeKm.toFixed(0)} km`;
+      opsEls.coverageRange.textContent = `${coverage.effectiveCoverageKm.toFixed(0)} km`;
+      opsEls.ductRange.textContent = coverage.ductRangeKm > 1 ? `${coverage.ductRangeKm.toFixed(0)} km` : '未形成';
+      opsEls.leoStatus.textContent = coverage.satBackupNeeded || leoBackupManual ? '建议启用' : '待命';
+      opsEls.message.textContent = coverage.profile.message;
+      opsEls.action.textContent = `处置建议：${coverage.satBackupNeeded ? '启用低轨卫星备份，并将远海船迹纳入补盲调度。' : coverage.profile.action}`;
+      opsEls.sceneAlert.textContent = `${coverage.status}：${coverage.coverageText}`;
+    };
+
     /**
      * 运行 PE 求解器并将结果渲染到热力图平面
      */
@@ -3123,6 +3493,9 @@
 
       // 计算实际场景距离 (坐标系单位 ≈ 米)
       const signalResult = propagationModel.computeSignal(dist3D, dt);
+      const operationalCoverage = applyOperationalImpact(signalResult, dist3D);
+      updateOpsPanel(operationalCoverage);
+      updateOpsVisualization(operationalCoverage, elapsed);
 
       // 信号强度分级
       let signalLevel, signalClass;
@@ -3315,6 +3688,26 @@
           updateAnalysisCharts();
           console.log('☁ 中性大气 (ASTD=0°C) — 标准传播');
           break;
+        case '6':
+          opsEls.select.value = 'duct-boost';
+          setIncident('duct-boost');
+          break;
+        case '7':
+          opsEls.select.value = 'duct-collapse';
+          setIncident('duct-collapse');
+          break;
+        case '8':
+          opsEls.select.value = 'storm-front';
+          setIncident('storm-front');
+          break;
+        case '9':
+          opsEls.select.value = 'leo-handover';
+          setIncident('leo-handover');
+          break;
+        case '0':
+          opsEls.select.value = 'base-fault';
+          setIncident('base-fault');
+          break;
         // ---- 数据操作 ----
         case 'e':
           // 导出信道数据
@@ -3376,6 +3769,7 @@
     console.log('  ⌨ WASD 移动船只 | R 重置视角 | F 聚焦船只');
     console.log('────────────────────────────────────────');
     console.log('  🌫 环境预设:  1强波导  2典型海域  3无波导  4极端  5中性');
+    console.log('  ⚠ 告警情景:  6波导增强  7波导消散  8暴雨海雾  9低轨补盲  0岸站故障');
     console.log('  📊 数据操作:  E导出CSV  H切换非均匀波导  C有/无对比');
     console.log('  🔮 算法: Split-Step Fourier PE (512×250)');
     console.log('  📈 左下角: M剖面图 + 路径损耗曲线');
