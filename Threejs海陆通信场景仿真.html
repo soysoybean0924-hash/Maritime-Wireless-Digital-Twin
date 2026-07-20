@@ -1695,10 +1695,48 @@
     controls.target.set(0, 3, -10);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
+    controls.enableZoom = false; // 使用自定义平滑滚轮缩放，避免远近档位式跳变
     controls.minDistance = 15;
     controls.maxDistance = 250;
     controls.maxPolarAngle = Math.PI * 0.48; // 限制低于水平线
     controls.update();
+
+    const smoothZoom = {
+      targetDistance: camera.position.distanceTo(controls.target),
+      minDistance: controls.minDistance,
+      maxDistance: controls.maxDistance,
+      response: 14,
+      wheelScale: 0.0014,
+    };
+
+    const syncSmoothZoomTarget = () => {
+      smoothZoom.targetDistance = THREE.MathUtils.clamp(
+        camera.position.distanceTo(controls.target),
+        smoothZoom.minDistance,
+        smoothZoom.maxDistance
+      );
+    };
+
+    const applySmoothZoom = (deltaTime) => {
+      const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+      const currentDistance = offset.length();
+      if (currentDistance < 0.001) return;
+
+      const t = 1 - Math.exp(-smoothZoom.response * deltaTime);
+      const nextDistance = THREE.MathUtils.lerp(currentDistance, smoothZoom.targetDistance, t);
+      offset.setLength(nextDistance);
+      camera.position.copy(controls.target).add(offset);
+    };
+
+    renderer.domElement.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      const delta = Math.sign(event.deltaY) * Math.min(Math.abs(event.deltaY), 120);
+      smoothZoom.targetDistance = THREE.MathUtils.clamp(
+        smoothZoom.targetDistance * Math.exp(delta * smoothZoom.wheelScale),
+        smoothZoom.minDistance,
+        smoothZoom.maxDistance
+      );
+    }, { passive: false });
 
     // ============================================
     // 2. 光照系统
@@ -3344,6 +3382,7 @@
       const elapsed = timestamp * 0.001;
 
       controls.update();
+      applySmoothZoom(dt);
 
       // JS 海面波浪动画
       const waveFunc = (px, pz, t, amp, freq, speed, dirX, dirZ) => {
@@ -3636,10 +3675,12 @@
         case 'r':
           camera.position.set(60, 35, 80);
           controls.target.set(0, 3, -10);
+          syncSmoothZoomTarget();
           controls.update();
           break;
         case 'f':
           controls.target.copy(boatGroup.position);
+          syncSmoothZoomTarget();
           controls.update();
           break;
         // ---- 环境参数控制 ----
