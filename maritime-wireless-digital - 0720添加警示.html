@@ -1,0 +1,1993 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>海面无线通信数字孪生仿真原型</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101418;
+      --panel: #181e24;
+      --panel-2: #202831;
+      --line: #34414d;
+      --text: #eef5f7;
+      --muted: #9fafb7;
+      --sea: #21899a;
+      --deep-sea: #0f4451;
+      --shore: #5f7d5f;
+      --sand: #b99d68;
+      --primary: #6ab7ff;
+      --good: #65d38c;
+      --warn: #f2b45d;
+      --bad: #ff7f78;
+      --relay: #d78dec;
+      --shadow: rgb(0 0 0 / 28%);
+      --bg-brightness: 1;
+      --bg-opacity: 0.72;
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        linear-gradient(180deg, #151b21 0%, #0f1519 58%, #0d1115 100%);
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto minmax(430px, 1fr) auto;
+      gap: 12px;
+      width: min(1440px, 100%);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 14px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: end;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: clamp(20px, 2.1vw, 30px);
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .subhead {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .source-row,
+    .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 28px;
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--text);
+      background: rgb(255 255 255 / 5%);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--good);
+      box-shadow: 0 0 12px currentColor;
+    }
+
+    .pill.pending {
+      color: var(--muted);
+    }
+
+    .pill.pending .dot {
+      background: var(--muted);
+      box-shadow: none;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(310px, 360px);
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .scene-shell,
+    .side,
+    .metric,
+    .loss-panel,
+    .channel-panel,
+    .profile-panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+      box-shadow: 0 16px 36px var(--shadow);
+    }
+
+    .scene-shell {
+      position: relative;
+      min-height: 460px;
+      overflow: hidden;
+      background: rgb(8 14 18);
+    }
+
+    .scene-shell::before {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background:
+        linear-gradient(180deg, rgb(8 14 18 / 4%), rgb(8 14 18 / 34%)),
+        url("射线轨迹图.png") center / cover no-repeat;
+      content: "";
+      filter: brightness(var(--bg-brightness));
+      opacity: var(--bg-opacity);
+    }
+
+    .scene-shell > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    #scene {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 460px;
+    }
+
+    .scene-overlay {
+      position: absolute;
+      inset: 12px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-rows: auto 1fr auto;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .link-state {
+      justify-self: start;
+    }
+
+    .sim-time {
+      justify-self: end;
+    }
+
+    .mini-map {
+      align-self: end;
+      width: min(360px, 100%);
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgb(12 18 22 / 70%);
+      backdrop-filter: blur(8px);
+    }
+
+    .mini-map svg {
+      display: block;
+      width: 100%;
+      height: 92px;
+    }
+
+    .scene-label {
+      position: absolute;
+      max-width: 136px;
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--text);
+      background: rgb(12 18 22 / 72%);
+      font-size: 12px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+    }
+
+    .scene-label.hidden {
+      display: none;
+    }
+
+    .scene-alert {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: grid;
+      gap: 3px;
+      min-width: 190px;
+      max-width: 240px;
+      padding: 10px 11px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      color: var(--text);
+      background: rgb(10 16 20 / 78%);
+      box-shadow: 0 12px 28px var(--shadow);
+      backdrop-filter: blur(10px);
+      pointer-events: none;
+    }
+
+    .scene-alert strong {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .scene-alert span {
+      font-size: 13px;
+      line-height: 1.42;
+    }
+
+    .scene-alert.warning {
+      border-color: var(--warn);
+      box-shadow: 0 0 0 1px rgb(242 180 93 / 22%), 0 12px 28px var(--shadow);
+    }
+
+    .scene-alert.critical {
+      border-color: var(--bad);
+      box-shadow: 0 0 0 1px rgb(255 127 120 / 24%), 0 12px 28px var(--shadow);
+    }
+
+    .alert-card {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgb(255 255 255 / 4%);
+    }
+
+    .alert-card.warning {
+      border-color: var(--warn);
+      background: rgb(242 180 93 / 12%);
+    }
+
+    .alert-card.critical {
+      border-color: var(--bad);
+      background: rgb(255 127 120 / 14%);
+    }
+
+    .alert-title {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .alert-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: fit-content;
+      min-height: 24px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgb(255 255 255 / 8%);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .alert-pill.warning {
+      color: var(--warn);
+      background: rgb(242 180 93 / 16%);
+    }
+
+    .alert-pill.critical {
+      color: #ffd0ca;
+      background: rgb(255 127 120 / 16%);
+    }
+
+    .operator-actions {
+      display: grid;
+      gap: 4px;
+      padding: 8px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      background: rgb(255 255 255 / 3%);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .side {
+      display: grid;
+      gap: 12px;
+      padding: 12px;
+      align-content: start;
+      overflow: auto;
+    }
+
+    .control-group {
+      display: grid;
+      gap: 10px;
+    }
+
+    .group-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .label-line {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .value {
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    input,
+    select,
+    button {
+      font: inherit;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--primary);
+    }
+
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--primary);
+    }
+
+    .check-row {
+      display: flex;
+      grid-template-columns: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .source-note {
+      display: grid;
+      gap: 5px;
+      padding: 9px 10px;
+      border-left: 3px solid var(--primary);
+      color: var(--muted);
+      background: rgb(255 255 255 / 4%);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    select {
+      width: 100%;
+      min-height: 34px;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--text);
+      background: var(--panel-2);
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    button {
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--text);
+      background: var(--panel-2);
+      cursor: pointer;
+    }
+
+    button.primary {
+      border-color: transparent;
+      color: #071115;
+      background: var(--primary);
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+      padding: 12px;
+    }
+
+    .metric span:first-child {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .metric strong {
+      overflow-wrap: anywhere;
+      font-size: clamp(21px, 2.2vw, 30px);
+      font-weight: 650;
+    }
+
+    .metric small {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .loss-panel,
+    .channel-panel {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+    }
+
+    .loss-panel svg,
+    .channel-panel svg,
+    .profile-panel svg {
+      width: 100%;
+      height: 76px;
+    }
+
+    .profile-panel {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+    }
+
+    .profile-panel svg {
+      height: 148px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .monitor-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 8px;
+    }
+
+    .monitor-item {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgb(255 255 255 / 4%);
+    }
+
+    .monitor-item span:first-child {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .monitor-item strong {
+      font-size: 18px;
+      font-weight: 650;
+    }
+
+    .swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      background: var(--primary);
+    }
+
+    .swatch.surface {
+      background: var(--sea);
+    }
+
+    .swatch.weather {
+      background: var(--warn);
+    }
+
+    .swatch.fade {
+      background: var(--relay);
+    }
+
+    .swatch.duct {
+      background: #82f0ff;
+    }
+
+    @media (max-width: 980px) {
+      .app {
+        min-height: auto;
+      }
+
+      header,
+      .main {
+        grid-template-columns: 1fr;
+      }
+
+      .source-row,
+      .status-row {
+        justify-content: flex-start;
+      }
+
+      .side {
+        overflow: visible;
+      }
+
+      .metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 560px) {
+      .app {
+        padding: 10px;
+      }
+
+      .scene-shell,
+      #scene {
+        min-height: 430px;
+      }
+
+      .scene-overlay {
+        grid-template-columns: 1fr;
+      }
+
+      .sim-time {
+        justify-self: start;
+      }
+
+      .metrics {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>海面无线通信数字孪生仿真原型</h1>
+        <p class="subhead">基站在岸边，三维映射海面、通信设备与移动船舶，按航迹和环境参数实时更新链路预算。</p>
+      </div>
+      <div class="source-row" aria-label="数据源状态">
+        <span class="pill"><span class="dot"></span>仿真数据驱动</span>
+        <span class="pill pending"><span class="dot"></span>AIS 待接入</span>
+        <span class="pill pending"><span class="dot"></span>气象待接入</span>
+        <span class="pill pending"><span class="dot"></span>实测信道待接入</span>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="scene-shell" aria-label="三维虚拟海面">
+        <canvas id="scene"></canvas>
+        <div class="scene-overlay" aria-hidden="true">
+          <span id="linkState" class="pill link-state"><span class="dot"></span><span>链路稳定</span></span>
+          <span id="simClock" class="pill sim-time"><span class="dot"></span><span>00:00</span></span>
+          <div class="mini-map">
+            <svg viewBox="0 0 320 92">
+              <path d="M14 70 C55 44 83 56 120 34 S206 41 306 15" fill="none" stroke="var(--line)" stroke-width="2"></path>
+              <path id="miniRoute" d="M22 76 C82 54 118 66 158 42 S241 45 300 20" fill="none" stroke="var(--primary)" stroke-width="3" stroke-linecap="round"></path>
+              <circle cx="22" cy="76" r="5" fill="var(--shore)"></circle>
+              <circle id="miniShip" cx="150" cy="45" r="5" fill="var(--good)"></circle>
+              <text x="12" y="17" fill="var(--muted)" font-size="11">航迹 / 通信覆盖示意</text>
+            </svg>
+          </div>
+        </div>
+        <span id="labelBase" class="scene-label">岸边基站</span>
+        <span id="labelBuoyA" class="scene-label">中继浮标 A</span>
+        <span id="labelBuoyB" class="scene-label">中继浮标 B</span>
+        <span id="labelShip" class="scene-label">移动船舶</span>
+        <div id="sceneAlert" class="scene-alert" aria-live="polite">
+          <strong id="sceneAlertTitle">正常运行</strong>
+          <span id="sceneAlertText">当前网络覆盖稳定，未触发运维告警</span>
+        </div>
+      </section>
+
+      <aside class="side" aria-label="交互参数">
+        <div class="control-group">
+          <div class="group-title"><span>环境参数</span><span id="waveSummary">浪高 1.4 m</span></div>
+          <label>
+            <span class="label-line"><span>海况等级</span><span id="seaValue" class="value">3 级</span></span>
+            <input id="seaState" type="range" min="0" max="6" step="1" value="3">
+          </label>
+          <label>
+            <span class="label-line"><span>风速</span><span id="windValue" class="value">10 m/s</span></span>
+            <input id="windSpeed" type="range" min="0" max="28" step="1" value="10">
+          </label>
+          <label>
+            <span class="label-line"><span>雨雾强度</span><span id="rainValue" class="value">2 mm/h</span></span>
+            <input id="rainRate" type="range" min="0" max="32" step="1" value="2">
+          </label>
+          <label>
+            <span class="label-line"><span>海面温度</span><span id="seaTempValue" class="value">26 °C</span></span>
+            <input id="seaTemp" type="range" min="5" max="35" step="0.5" value="26">
+          </label>
+          <label>
+            <span class="label-line"><span>近海面气温</span><span id="airTempValue" class="value">23 °C</span></span>
+            <input id="airTemp" type="range" min="0" max="35" step="0.5" value="23">
+          </label>
+          <label>
+            <span class="label-line"><span>相对湿度</span><span id="humidityValue" class="value">72%</span></span>
+            <input id="humidity" type="range" min="35" max="100" step="1" value="72">
+          </label>
+          <label>
+            <span class="label-line"><span>海平面气压</span><span id="pressureValue" class="value">1013 hPa</span></span>
+            <input id="pressure" type="range" min="980" max="1040" step="1" value="1013">
+          </label>
+        </div>
+
+        <div class="control-group">
+          <div class="group-title"><span>蒸汽波导调节</span><span id="ductControlSummary">已启用 / 100%</span></div>
+          <label class="check-row">
+            <span>启用蒸汽波导</span>
+            <input id="ductEnabled" type="checkbox" checked>
+          </label>
+          <label>
+            <span class="label-line"><span>近海面湿度梯度</span><span id="ductStrengthValue" class="value">100%</span></span>
+            <input id="ductStrength" type="range" min="40" max="160" step="5" value="100">
+          </label>
+          <label>
+            <span class="label-line"><span>混合层厚度</span><span id="ductMixingValue" class="value">5.0 m</span></span>
+            <input id="ductMixing" type="range" min="1.5" max="12" step="0.5" value="5">
+          </label>
+          <label>
+            <span class="label-line"><span>EDH 校准偏置</span><span id="ductHeightBiasValue" class="value">0 m</span></span>
+            <input id="ductHeightBias" type="range" min="-8" max="12" step="1" value="0">
+          </label>
+          <div class="source-note">
+            <span>来源：N/M 折射率剖面采用 ITU-R P.453 常用无线电折射率形式；射线分区依据论文图 3-5 的轨迹特征抽象。</span>
+            <span>说明：EDH 以下显示蒸发波导影响层，EDH 以上显示非陷获逃逸区。</span>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <div class="group-title"><span>船舶航迹</span><span id="aisSummary">MMSI 412000128</span></div>
+          <label>
+            <span class="label-line"><span>航迹位置</span><span id="trackValue" class="value">42%</span></span>
+            <input id="trackProgress" type="range" min="0" max="100" step="1" value="42">
+          </label>
+          <label>
+            <span class="label-line"><span>船速</span><span id="speedValue" class="value">12 kn</span></span>
+            <input id="shipSpeed" type="range" min="0" max="28" step="1" value="12">
+          </label>
+        </div>
+
+        <div class="control-group">
+          <div class="group-title"><span>通信模型</span><span id="modelSummary">两径海面</span></div>
+          <label>
+            <span class="label-line"><span>频段</span><span id="bandValue" class="value">2.4 GHz</span></span>
+            <select id="bandSelect">
+              <option value="433">433 MHz</option>
+              <option value="915">915 MHz</option>
+              <option value="2400" selected>2.4 GHz</option>
+              <option value="5800">5.8 GHz</option>
+            </select>
+          </label>
+          <label>
+            <span class="label-line"><span>传播模型</span><span id="modelValue" class="value">两径海面</span></span>
+            <select id="modelSelect">
+              <option value="fspl">自由空间</option>
+              <option value="tworay" selected>两径海面</option>
+              <option value="weather">海面 + 雨雾</option>
+            </select>
+          </label>
+          <label>
+            <span class="label-line"><span>发射功率</span><span id="txValue" class="value">30 dBm</span></span>
+            <input id="txPower" type="range" min="18" max="42" step="1" value="30">
+          </label>
+          <label>
+            <span class="label-line"><span>岸站天线高度</span><span id="heightValue" class="value">24 m</span></span>
+            <input id="antennaHeight" type="range" min="8" max="46" step="1" value="24">
+          </label>
+        </div>
+
+        <div class="control-group">
+          <div class="group-title"><span>异常 / 事故联动</span><span id="incidentSummary">默认正常</span></div>
+          <label>
+            <span class="label-line"><span>事故场景</span><span id="incidentTypeValue" class="value">无</span></span>
+            <select id="incidentSelect">
+              <option value="none" selected>无</option>
+              <option value="base-fault">基站故障 / 覆盖中断</option>
+              <option value="weather-fault">暴雨霾 / 突发恶劣天气</option>
+              <option value="relay-fault">中继浮标失联</option>
+              <option value="ship-fault">船载天线异常偏航</option>
+            </select>
+          </label>
+          <div id="alertCard" class="alert-card">
+            <div class="alert-title">运维提示</div>
+            <strong id="alertTitle">当前链路稳定</strong>
+            <div id="alertSeverity" class="alert-pill">正常</div>
+            <div id="alertMessage">当前覆盖满足运营商服务要求，建议继续监测。</div>
+            <div class="operator-actions">
+              <span id="alertAction">建议：保持现有频段与链路余量观察。</span>
+              <span>运营商关注：覆盖空洞、服务等级与应急切换。</span>
+            </div>
+          </div>
+          <div class="operator-actions">
+            <span id="coverageStatusLabel">覆盖状态：稳定</span>
+            <span id="coverageRangeLabel">波导水平距离：0 km / 有效覆盖：0 km</span>
+            <span id="backupLabel">低轨卫星备份：暂不需要</span>
+          </div>
+          <label class="check-row">
+            <span>低轨卫星备份预案</span>
+            <input id="satBackupEnabled" type="checkbox">
+          </label>
+          <div class="button-row">
+            <button id="applyIncident" class="primary" type="button">触发告警</button>
+            <button id="clearIncident" type="button">清除</button>
+          </div>
+        </div>
+
+        <div class="button-row">
+          <button id="playToggle" class="primary" type="button" data-running="true">暂停</button>
+          <button id="resetView" type="button">重置视角</button>
+        </div>
+
+        <div class="control-group">
+          <div class="group-title"><span>背景图显示</span><span id="backgroundSummary">亮度 100%</span></div>
+          <label>
+            <span class="label-line"><span>图片亮度</span><span id="bgBrightnessValue" class="value">100%</span></span>
+            <input id="bgBrightness" type="range" min="40" max="160" step="5" value="100">
+          </label>
+          <label>
+            <span class="label-line"><span>图片透明度</span><span id="bgOpacityValue" class="value">72%</span></span>
+            <input id="bgOpacity" type="range" min="0" max="100" step="5" value="72">
+          </label>
+        </div>
+      </aside>
+    </main>
+
+    <section class="metrics" aria-label="实时链路预算">
+      <div class="metric">
+        <span>通信距离</span>
+        <strong id="distanceMetric">8.2 km</strong>
+        <small id="horizonMetric">无线视距 28 km</small>
+      </div>
+      <div class="metric">
+        <span>路径损耗</span>
+        <strong id="lossMetric">119 dB</strong>
+        <small id="lossDetail">自由空间 + 海面反射</small>
+      </div>
+      <div class="metric">
+        <span>接收功率</span>
+        <strong id="rxMetric">-76 dBm</strong>
+        <small id="snrMetric">SNR 20 dB</small>
+      </div>
+      <div class="metric">
+        <span>通信质量</span>
+        <strong id="qualityMetric">稳定</strong>
+        <small id="packetMetric">丢包估计 0.7%</small>
+      </div>
+      <div class="metric">
+        <span>蒸发波导</span>
+        <strong id="ductMetric">EDH 18 m</strong>
+        <small id="ductGainMetric">M 缺陷 5 M，传播修正 4 dB</small>
+      </div>
+    </section>
+
+    <section class="loss-panel" aria-label="路径损耗分解">
+      <svg viewBox="0 0 920 76" role="img" aria-label="路径损耗分解条">
+        <line x1="0" y1="45" x2="920" y2="45" stroke="var(--line)" stroke-width="1"></line>
+        <rect id="barFspl" x="0" y="18" width="650" height="24" rx="4" fill="var(--primary)"></rect>
+        <rect id="barSurface" x="650" y="18" width="50" height="24" rx="4" fill="var(--sea)"></rect>
+        <rect id="barWeather" x="700" y="18" width="10" height="24" rx="4" fill="var(--warn)"></rect>
+        <rect id="barFade" x="710" y="18" width="38" height="24" rx="4" fill="var(--relay)"></rect>
+        <rect id="barDuct" x="0" y="48" width="36" height="8" rx="4" fill="#82f0ff"></rect>
+        <text id="barTotal" x="0" y="68" fill="var(--text)" font-size="13">总损耗 119 dB</text>
+        <text id="barBudget" x="920" y="68" text-anchor="end" fill="var(--text)" font-size="13">链路余量 10 dB</text>
+      </svg>
+      <div class="legend">
+        <span class="legend-item"><span class="swatch"></span>自由空间路径损耗</span>
+        <span class="legend-item"><span class="swatch surface"></span>海浪/姿态附加损耗</span>
+        <span class="legend-item"><span class="swatch weather"></span>雨雾散射</span>
+        <span class="legend-item"><span class="swatch fade"></span>两径衰落/视距惩罚</span>
+        <span class="legend-item"><span class="swatch duct"></span>蒸发波导增益</span>
+      </div>
+    </section>
+
+    <section class="loss-panel" aria-label="实时信号监测">
+      <div class="legend">
+        <span class="legend-item"><span class="swatch duct"></span>实时信号监测</span>
+        <span id="monitorSummary">当前链路稳定</span>
+      </div>
+      <div class="monitor-grid">
+        <div class="monitor-item"><span>RSSI</span><strong id="monitorRssi">-76 dBm</strong></div>
+        <div class="monitor-item"><span>SNR</span><strong id="monitorSnr">20 dB</strong></div>
+        <div class="monitor-item"><span>链路余量</span><strong id="monitorMargin">10 dB</strong></div>
+        <div class="monitor-item"><span>噪声底</span><strong id="monitorNoise">-96 dBm</strong></div>
+        <div class="monitor-item"><span>丢包率</span><strong id="monitorPacket">0.7%</strong></div>
+        <div class="monitor-item"><span>估计吞吐</span><strong id="monitorRate">18 Mbps</strong></div>
+      </div>
+    </section>
+
+    <section class="channel-panel" aria-label="信道建模路径损耗曲线">
+      <svg viewBox="0 0 920 170" role="img" aria-label="路径损耗随通信距离变化曲线">
+        <line x1="54" y1="132" x2="890" y2="132" stroke="var(--line)" stroke-width="1"></line>
+        <line x1="54" y1="18" x2="54" y2="132" stroke="var(--line)" stroke-width="1"></line>
+        <path id="channelFsplPath" d="" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 5"></path>
+        <path id="channelTotalPath" d="" fill="none" stroke="var(--primary)" stroke-width="3" stroke-linecap="round"></path>
+        <circle id="channelPoint" cx="260" cy="80" r="5" fill="var(--warn)"></circle>
+        <text x="54" y="158" fill="var(--muted)" font-size="12">距离 km</text>
+        <text x="10" y="22" fill="var(--muted)" font-size="12">损耗 dB</text>
+        <text id="channelInfo" x="890" y="22" text-anchor="end" fill="var(--text)" font-size="13">当前路径损耗 119 dB</text>
+      </svg>
+      <div class="legend">
+        <span class="legend-item"><span class="swatch"></span>综合路径损耗</span>
+        <span class="legend-item"><span class="swatch fade"></span>自由空间基准</span>
+        <span class="legend-item"><span class="swatch duct"></span>EDH / M 剖面修正随气象参数实时变化</span>
+      </div>
+    </section>
+
+    <section class="profile-panel" aria-label="折射率剖面与 EDH 计算">
+      <svg viewBox="0 0 920 148" role="img" aria-label="修正折射率 M 随高度变化曲线">
+        <line x1="52" y1="122" x2="890" y2="122" stroke="var(--line)" stroke-width="1"></line>
+        <line x1="52" y1="18" x2="52" y2="122" stroke="var(--line)" stroke-width="1"></line>
+        <path id="mProfilePath" d="" fill="none" stroke="#82f0ff" stroke-width="3" stroke-linecap="round"></path>
+        <line id="edhLine" x1="52" x2="890" y1="88" y2="88" stroke="var(--warn)" stroke-width="2" stroke-dasharray="6 5"></line>
+        <circle id="edhMarker" cx="200" cy="88" r="5" fill="var(--warn)"></circle>
+        <text x="52" y="142" fill="var(--muted)" font-size="12">修正折射率 M</text>
+        <text x="12" y="22" fill="var(--muted)" font-size="12">高度</text>
+        <text id="profileInfo" x="890" y="22" text-anchor="end" fill="var(--text)" font-size="13">EDH 18 m</text>
+      </svg>
+      <div class="legend">
+        <span class="legend-item"><span class="swatch duct"></span>M(z)=N(z)+0.157z</span>
+        <span class="legend-item"><span class="swatch weather"></span>EDH：M 曲线近海面最小值高度</span>
+      </div>
+    </section>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+    const canvas = document.getElementById("scene");
+    const shell = canvas.parentElement;
+    const ui = {
+      sea: document.getElementById("seaState"),
+      wind: document.getElementById("windSpeed"),
+      rain: document.getElementById("rainRate"),
+      seaTemp: document.getElementById("seaTemp"),
+      airTemp: document.getElementById("airTemp"),
+      humidity: document.getElementById("humidity"),
+      pressure: document.getElementById("pressure"),
+      ductEnabled: document.getElementById("ductEnabled"),
+      ductStrength: document.getElementById("ductStrength"),
+      ductMixing: document.getElementById("ductMixing"),
+      ductHeightBias: document.getElementById("ductHeightBias"),
+      track: document.getElementById("trackProgress"),
+      speed: document.getElementById("shipSpeed"),
+      band: document.getElementById("bandSelect"),
+      model: document.getElementById("modelSelect"),
+      tx: document.getElementById("txPower"),
+      height: document.getElementById("antennaHeight"),
+      bgBrightness: document.getElementById("bgBrightness"),
+      bgOpacity: document.getElementById("bgOpacity"),
+      satBackupEnabled: document.getElementById("satBackupEnabled"),
+      incident: document.getElementById("incidentSelect"),
+      applyIncident: document.getElementById("applyIncident"),
+      clearIncident: document.getElementById("clearIncident"),
+      play: document.getElementById("playToggle"),
+      reset: document.getElementById("resetView")
+    };
+    const out = {
+      sea: document.getElementById("seaValue"),
+      wind: document.getElementById("windValue"),
+      rain: document.getElementById("rainValue"),
+      seaTemp: document.getElementById("seaTempValue"),
+      airTemp: document.getElementById("airTempValue"),
+      humidity: document.getElementById("humidityValue"),
+      pressure: document.getElementById("pressureValue"),
+      ductControlSummary: document.getElementById("ductControlSummary"),
+      ductStrength: document.getElementById("ductStrengthValue"),
+      ductMixing: document.getElementById("ductMixingValue"),
+      ductHeightBias: document.getElementById("ductHeightBiasValue"),
+      track: document.getElementById("trackValue"),
+      speed: document.getElementById("speedValue"),
+      band: document.getElementById("bandValue"),
+      model: document.getElementById("modelValue"),
+      tx: document.getElementById("txValue"),
+      height: document.getElementById("heightValue"),
+      bgBrightness: document.getElementById("bgBrightnessValue"),
+      bgOpacity: document.getElementById("bgOpacityValue"),
+      backgroundSummary: document.getElementById("backgroundSummary"),
+      modelSummary: document.getElementById("modelSummary"),
+      waveSummary: document.getElementById("waveSummary"),
+      incidentSummary: document.getElementById("incidentSummary"),
+      incidentTypeValue: document.getElementById("incidentTypeValue"),
+      alertCard: document.getElementById("alertCard"),
+      alertTitle: document.getElementById("alertTitle"),
+      alertSeverity: document.getElementById("alertSeverity"),
+      alertMessage: document.getElementById("alertMessage"),
+      alertAction: document.getElementById("alertAction"),
+      coverageStatusLabel: document.getElementById("coverageStatusLabel"),
+      coverageRangeLabel: document.getElementById("coverageRangeLabel"),
+      backupLabel: document.getElementById("backupLabel"),
+      sceneAlert: document.getElementById("sceneAlert"),
+      sceneAlertTitle: document.getElementById("sceneAlertTitle"),
+      sceneAlertText: document.getElementById("sceneAlertText"),
+      distance: document.getElementById("distanceMetric"),
+      horizon: document.getElementById("horizonMetric"),
+      loss: document.getElementById("lossMetric"),
+      lossDetail: document.getElementById("lossDetail"),
+      rx: document.getElementById("rxMetric"),
+      snr: document.getElementById("snrMetric"),
+      quality: document.getElementById("qualityMetric"),
+      packet: document.getElementById("packetMetric"),
+      ductMetric: document.getElementById("ductMetric"),
+      ductGain: document.getElementById("ductGainMetric"),
+      linkState: document.getElementById("linkState"),
+      simClock: document.getElementById("simClock"),
+      miniShip: document.getElementById("miniShip"),
+      barTotal: document.getElementById("barTotal"),
+      barBudget: document.getElementById("barBudget"),
+      monitorSummary: document.getElementById("monitorSummary"),
+      monitorRssi: document.getElementById("monitorRssi"),
+      monitorSnr: document.getElementById("monitorSnr"),
+      monitorMargin: document.getElementById("monitorMargin"),
+      monitorNoise: document.getElementById("monitorNoise"),
+      monitorPacket: document.getElementById("monitorPacket"),
+      monitorRate: document.getElementById("monitorRate"),
+      channelFsplPath: document.getElementById("channelFsplPath"),
+      channelTotalPath: document.getElementById("channelTotalPath"),
+      channelPoint: document.getElementById("channelPoint"),
+      channelInfo: document.getElementById("channelInfo"),
+      profilePath: document.getElementById("mProfilePath"),
+      edhLine: document.getElementById("edhLine"),
+      edhMarker: document.getElementById("edhMarker"),
+      profileInfo: document.getElementById("profileInfo")
+    };
+    const bars = {
+      fspl: document.getElementById("barFspl"),
+      surface: document.getElementById("barSurface"),
+      weather: document.getElementById("barWeather"),
+      fade: document.getElementById("barFade"),
+      duct: document.getElementById("barDuct")
+    };
+    const labels = {
+      base: document.getElementById("labelBase"),
+      buoyA: document.getElementById("labelBuoyA"),
+      buoyB: document.getElementById("labelBuoyB"),
+      ship: document.getElementById("labelShip")
+    };
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setClearColor(0x000000, 0);
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x111a20, 58, 118);
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 220);
+    camera.position.set(22, 18, 32);
+    const orbit = new OrbitControls(camera, renderer.domElement);
+    orbit.enableDamping = true;
+    orbit.dampingFactor = 0.08;
+    orbit.minDistance = 17;
+    orbit.maxDistance = 66;
+    orbit.maxPolarAngle = Math.PI * 0.49;
+    orbit.target.set(2, 0.8, 0);
+
+    const clock = new THREE.Clock();
+    const scaleKm = 0.45;
+    const baseWorld = new THREE.Vector3(-27, 0.35, -9);
+    const buoyAPos = new THREE.Vector3(-8, 0.45, 6);
+    const buoyBPos = new THREE.Vector3(8, 0.45, -8);
+    const routePoints = [
+      new THREE.Vector3(-15, 0.08, -14),
+      new THREE.Vector3(-7, 0.08, -8),
+      new THREE.Vector3(2, 0.08, -10),
+      new THREE.Vector3(10, 0.08, -4),
+      new THREE.Vector3(18, 0.08, 4),
+      new THREE.Vector3(25, 0.08, 11)
+    ];
+    const route = new THREE.CatmullRomCurve3(routePoints, false, "catmullrom", 0.35);
+    const history = [];
+
+    const colors = {
+      sea: new THREE.Color("#21899a"),
+      deep: new THREE.Color("#0f4451"),
+      foam: new THREE.Color("#d8fbff"),
+      shore: new THREE.Color("#5f7d5f"),
+      sand: new THREE.Color("#b99d68"),
+      coastline: new THREE.Color("#f3dfab"),
+      primary: new THREE.Color("#6ab7ff"),
+      good: new THREE.Color("#65d38c"),
+      warn: new THREE.Color("#f2b45d"),
+      bad: new THREE.Color("#ff7f78"),
+      duct: new THREE.Color("#82f0ff"),
+      relay: new THREE.Color("#d78dec"),
+      metal: new THREE.Color("#d8e5e9"),
+      hull: new THREE.Color("#4fb2ce")
+    };
+
+    scene.add(new THREE.HemisphereLight(0xb7e7ff, 0x12414a, 2.15));
+    const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+    sun.position.set(-18, 30, 18);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    scene.add(sun);
+
+    const skyMaterial = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      transparent: true,
+      uniforms: {
+        topColor: { value: new THREE.Color("#2a5d72") },
+        horizonColor: { value: new THREE.Color("#121b20") }
+      },
+      vertexShader: `
+        varying vec3 worldDirection;
+        void main() {
+          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+          worldDirection = normalize(worldPosition.xyz);
+          gl_Position = projectionMatrix * viewMatrix * worldPosition;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 worldDirection;
+        uniform vec3 topColor;
+        uniform vec3 horizonColor;
+        void main() {
+          float h = smoothstep(-0.15, 0.95, worldDirection.y);
+          gl_FragColor = vec4(mix(horizonColor, topColor, h), 0.34);
+        }
+      `
+    });
+    scene.add(new THREE.Mesh(new THREE.SphereGeometry(110, 36, 18), skyMaterial));
+
+    const oceanMaterial = new THREE.ShaderMaterial({
+      transparent: true,
+      uniforms: {
+        time: { value: 0 },
+        amp: { value: 0.7 },
+        wind: { value: 0.5 },
+        deep: { value: colors.deep },
+        sea: { value: colors.sea },
+        foam: { value: colors.foam }
+      },
+      vertexShader: `
+        varying float waveHeight;
+        varying vec2 vUv;
+        uniform float time;
+        uniform float amp;
+        uniform float wind;
+        float wave(vec2 p, float speed, float scale, float height) {
+          return sin(p.x * scale + time * speed) * cos(p.y * scale * 0.72 + time * speed * 0.65) * height;
+        }
+        void main() {
+          vUv = uv;
+          vec3 pos = position;
+          float w1 = wave(pos.xz, 0.82 + wind * 0.2, 0.18 + wind * 0.03, amp);
+          float w2 = wave(pos.zx + 13.0, 1.26 + wind * 0.2, 0.42, amp * 0.36);
+          float w3 = sin((pos.x + pos.z * 0.72) * (0.68 + wind * 0.05) + time * 1.56) * amp * 0.13;
+          pos.y += w1 + w2 + w3;
+          waveHeight = pos.y;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying float waveHeight;
+        varying vec2 vUv;
+        uniform vec3 deep;
+        uniform vec3 sea;
+        uniform vec3 foam;
+        void main() {
+          float band = smoothstep(-0.72, 1.42, waveHeight);
+          float ripple = sin(vUv.x * 260.0) * sin(vUv.y * 210.0) * 0.035;
+          float crest = smoothstep(0.72, 1.22, waveHeight);
+          vec3 color = mix(deep, sea, band + ripple);
+          color = mix(color, foam, crest * 0.36);
+          gl_FragColor = vec4(color, 0.72);
+        }
+      `
+    });
+    const oceanGeometry = new THREE.PlaneGeometry(108, 108, 178, 178);
+    oceanGeometry.rotateX(-Math.PI / 2);
+    const ocean = new THREE.Mesh(oceanGeometry, oceanMaterial);
+    ocean.receiveShadow = true;
+    scene.add(ocean);
+
+    const ductMaterial = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      uniforms: {
+        time: { value: 0 },
+        opacity: { value: 0.34 },
+        ductColor: { value: colors.duct }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        uniform float time;
+        void main() {
+          vUv = uv;
+          vec3 pos = position;
+          pos.y += sin(pos.x * 0.16 + time * 0.55) * 0.035 + cos(pos.z * 0.12 + time * 0.38) * 0.025;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform vec3 ductColor;
+        uniform float opacity;
+        uniform float time;
+        void main() {
+          float stripe = 0.55 + 0.45 * sin(vUv.x * 70.0 + time * 1.3);
+          float edge = smoothstep(0.0, 0.18, vUv.y) * (1.0 - smoothstep(0.82, 1.0, vUv.y));
+          gl_FragColor = vec4(ductColor, opacity * edge * (0.45 + 0.25 * stripe));
+        }
+      `
+    });
+    const ductLayer = new THREE.Mesh(new THREE.PlaneGeometry(96, 96, 48, 48), ductMaterial);
+    ductLayer.rotation.x = -Math.PI / 2;
+    ductLayer.position.y = 1.8;
+    scene.add(ductLayer);
+
+    const ductBoundaryMaterial = new THREE.MeshBasicMaterial({
+      color: colors.warn,
+      transparent: true,
+      opacity: 0.16,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const ductBoundary = new THREE.Mesh(new THREE.PlaneGeometry(96, 96, 1, 1), ductBoundaryMaterial);
+    ductBoundary.rotation.x = -Math.PI / 2;
+    ductBoundary.position.y = 2.2;
+    scene.add(ductBoundary);
+
+    const incidentHalo = new THREE.Mesh(
+      new THREE.TorusGeometry(4.4, 0.16, 12, 36),
+      new THREE.MeshBasicMaterial({ color: colors.warn, transparent: true, opacity: 0.86 })
+    );
+    incidentHalo.rotation.x = Math.PI / 2;
+    incidentHalo.visible = false;
+    scene.add(incidentHalo);
+
+    const ductRayGroup = new THREE.Group();
+    scene.add(ductRayGroup);
+    const trappedRayMaterial = new THREE.LineBasicMaterial({ color: colors.duct, transparent: true, opacity: 0.82 });
+    const escapeRayMaterial = new THREE.LineBasicMaterial({ color: colors.warn, transparent: true, opacity: 0.54 });
+    const boundaryLineMaterial = new THREE.LineDashedMaterial({ color: colors.warn, transparent: true, opacity: 0.8, dashSize: 0.85, gapSize: 0.52 });
+    const trappedRays = Array.from({ length: 8 }, () => {
+      const line = new THREE.Line(new THREE.BufferGeometry(), trappedRayMaterial);
+      ductRayGroup.add(line);
+      return line;
+    });
+    const escapeRays = Array.from({ length: 5 }, () => {
+      const line = new THREE.Line(new THREE.BufferGeometry(), escapeRayMaterial);
+      ductRayGroup.add(line);
+      return line;
+    });
+    const ductBoundaryLine = new THREE.Line(new THREE.BufferGeometry(), boundaryLineMaterial);
+    ductRayGroup.add(ductBoundaryLine);
+
+    function standard(color, roughness = 0.66, metalness = 0.05) {
+      return new THREE.MeshStandardMaterial({ color, roughness, metalness });
+    }
+
+    const materials = {
+      shore: standard(colors.shore, 0.82),
+      sand: standard(colors.sand, 0.9),
+      coastline: standard(colors.coastline, 0.78),
+      deck: standard("#56636a", 0.72),
+      tower: standard("#a3c4d4", 0.46, 0.16),
+      antenna: standard(colors.metal, 0.34, 0.32),
+      buoy: standard(colors.relay, 0.56),
+      hull: standard(colors.hull, 0.55, 0.08),
+      cabin: standard("#e1ecef", 0.45),
+      route: new THREE.LineBasicMaterial({ color: 0xe7f5f7, transparent: true, opacity: 0.35 }),
+      history: new THREE.LineBasicMaterial({ color: colors.good, transparent: true, opacity: 0.88 }),
+      direct: new THREE.LineBasicMaterial({ color: colors.good, transparent: true, opacity: 0.95 }),
+      relay: new THREE.LineBasicMaterial({ color: colors.primary, transparent: true, opacity: 0.48 })
+    };
+
+    function addMesh(parent, geometry, material, position, rotation, scale) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(position || new THREE.Vector3());
+      if (rotation) mesh.rotation.set(rotation.x || 0, rotation.y || 0, rotation.z || 0);
+      if (scale) mesh.scale.copy(scale);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function createShore() {
+      const group = new THREE.Group();
+      const landShape = new THREE.Shape();
+      landShape.moveTo(-54, -54);
+      landShape.lineTo(-17, -54);
+      landShape.bezierCurveTo(-13, -39, -19, -27, -13, -15);
+      landShape.bezierCurveTo(-8, -4, -17, 8, -9, 20);
+      landShape.bezierCurveTo(-14, 31, -17, 42, -11, 54);
+      landShape.lineTo(-54, 54);
+      landShape.closePath();
+      const land = new THREE.Mesh(new THREE.ShapeGeometry(landShape), materials.shore);
+      land.rotation.x = -Math.PI / 2;
+      land.position.y = 0.16;
+      land.receiveShadow = true;
+      group.add(land);
+
+      const beachShape = new THREE.Shape();
+      beachShape.moveTo(-18, -54);
+      beachShape.bezierCurveTo(-13, -39, -19, -27, -13, -15);
+      beachShape.bezierCurveTo(-8, -4, -17, 8, -9, 20);
+      beachShape.bezierCurveTo(-14, 31, -17, 42, -11, 54);
+      beachShape.lineTo(-4, 54);
+      beachShape.bezierCurveTo(-10, 42, -7, 31, -2, 20);
+      beachShape.bezierCurveTo(-10, 8, -1, -4, -6, -15);
+      beachShape.bezierCurveTo(-12, -27, -6, -39, -10, -54);
+      beachShape.closePath();
+      const beach = new THREE.Mesh(new THREE.ShapeGeometry(beachShape), materials.sand);
+      beach.rotation.x = -Math.PI / 2;
+      beach.position.y = 0.2;
+      beach.receiveShadow = true;
+      group.add(beach);
+
+      const coastPoints = [
+        new THREE.Vector3(-9.5, 0.28, -54),
+        new THREE.Vector3(-6, 0.28, -38),
+        new THREE.Vector3(-8.5, 0.28, -24),
+        new THREE.Vector3(-3.6, 0.28, -10),
+        new THREE.Vector3(-7.2, 0.28, 4),
+        new THREE.Vector3(-1.8, 0.28, 19),
+        new THREE.Vector3(-6.6, 0.28, 34),
+        new THREE.Vector3(-3.8, 0.28, 54)
+      ];
+      const coastCurve = new THREE.CatmullRomCurve3(coastPoints, false, "catmullrom", 0.32);
+      const coastLine = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(coastCurve.getPoints(120)),
+        new THREE.LineBasicMaterial({ color: 0xf3dfab, linewidth: 2, transparent: true, opacity: 0.96 })
+      );
+      group.add(coastLine);
+
+      const basePad = addMesh(group, new THREE.BoxGeometry(8.5, 0.32, 5.8), materials.coastline, new THREE.Vector3(baseWorld.x + 1, 0.34, baseWorld.z), null, null);
+      basePad.receiveShadow = true;
+
+      for (const z of [-36, -20, -4, 12, 28]) {
+        const road = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-50, 0.36, z),
+            new THREE.Vector3(-18, 0.36, z + 4)
+          ]),
+          new THREE.LineBasicMaterial({ color: 0x2f3f35, transparent: true, opacity: 0.55 })
+        );
+        group.add(road);
+      }
+      return group;
+    }
+
+    function createBase() {
+      const group = new THREE.Group();
+      addMesh(group, new THREE.BoxGeometry(5.4, 0.55, 3.8), materials.deck, new THREE.Vector3(0.1, 0.28, 0));
+      addMesh(group, new THREE.CylinderGeometry(0.24, 0.38, 5.9, 8), materials.tower, new THREE.Vector3(0, 3.32, 0));
+      addMesh(group, new THREE.CylinderGeometry(0.08, 0.08, 2.4, 12), materials.antenna, new THREE.Vector3(0, 6.7, 0));
+      addMesh(group, new THREE.TorusGeometry(0.78, 0.024, 8, 44), materials.antenna, new THREE.Vector3(0, 5.36, 0), { x: Math.PI / 2 });
+      group.userData.heightMarker = addMesh(group, new THREE.CylinderGeometry(0.045, 0.045, 1, 10), materials.antenna, new THREE.Vector3(0, 7.0, 0));
+      group.position.copy(baseWorld);
+      return group;
+    }
+
+    function createBuoy(scale = 1) {
+      const group = new THREE.Group();
+      addMesh(group, new THREE.CylinderGeometry(0.95 * scale, 1.08 * scale, 0.72 * scale, 32), materials.buoy, new THREE.Vector3(0, 0.1, 0));
+      addMesh(group, new THREE.TorusGeometry(1.14 * scale, 0.11 * scale, 12, 48), materials.deck, new THREE.Vector3(0, 0.18, 0), { x: Math.PI / 2 });
+      addMesh(group, new THREE.CylinderGeometry(0.07, 0.07, 3.0 * scale, 12), materials.antenna, new THREE.Vector3(0, 1.84 * scale, 0));
+      addMesh(group, new THREE.SphereGeometry(0.16 * scale, 16, 12), materials.antenna, new THREE.Vector3(0, 3.38 * scale, 0));
+      return group;
+    }
+
+    function createShip() {
+      const group = new THREE.Group();
+      addMesh(group, new THREE.BoxGeometry(3.25, 0.64, 1.16), materials.hull, new THREE.Vector3(0, 0.34, 0));
+      addMesh(group, new THREE.ConeGeometry(0.62, 1.2, 4), materials.hull, new THREE.Vector3(1.94, 0.34, 0), { z: -Math.PI / 2, y: Math.PI / 4 });
+      addMesh(group, new THREE.BoxGeometry(1.08, 0.62, 0.84), materials.cabin, new THREE.Vector3(-0.36, 0.98, 0));
+      addMesh(group, new THREE.CylinderGeometry(0.045, 0.045, 1.75, 10), materials.antenna, new THREE.Vector3(0.32, 2.0, 0));
+      addMesh(group, new THREE.SphereGeometry(0.12, 12, 8), materials.antenna, new THREE.Vector3(0.32, 2.88, 0));
+      return group;
+    }
+
+    scene.add(createShore());
+    const base = createBase();
+    const buoyA = createBuoy(1);
+    const buoyB = createBuoy(0.86);
+    const ship = createShip();
+    buoyA.position.copy(buoyAPos);
+    buoyB.position.copy(buoyBPos);
+    scene.add(base, buoyA, buoyB, ship);
+
+    const routeLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(route.getPoints(110)), materials.route);
+    routeLine.position.y = 0.12;
+    scene.add(routeLine);
+    const historyLine = new THREE.Line(new THREE.BufferGeometry(), materials.history);
+    scene.add(historyLine);
+
+    const linkGroup = new THREE.Group();
+    const mainLink = new THREE.Line(new THREE.BufferGeometry(), materials.direct);
+    const buoyLinkA = new THREE.Line(new THREE.BufferGeometry(), materials.relay);
+    const buoyLinkB = new THREE.Line(new THREE.BufferGeometry(), materials.relay);
+    linkGroup.add(mainLink, buoyLinkA, buoyLinkB);
+    scene.add(linkGroup);
+
+    const pulseGeometry = new THREE.SphereGeometry(0.12, 12, 8);
+    const pulseMaterial = new THREE.MeshBasicMaterial({ color: colors.good, transparent: true, opacity: 0.95 });
+    const pulses = Array.from({ length: 6 }, () => new THREE.Mesh(pulseGeometry, pulseMaterial));
+    pulses.forEach((pulse) => linkGroup.add(pulse));
+    let mainCurve = new THREE.QuadraticBezierCurve3();
+
+    function makeCurve(start, end, lift = 4.8) {
+      const middle = start.clone().lerp(end, 0.5);
+      middle.y += lift + start.distanceTo(end) * 0.05;
+      return new THREE.QuadraticBezierCurve3(start, middle, end);
+    }
+
+    function waveHeight(x, z, time, amp, wind) {
+      return (
+        Math.sin(x * (0.18 + wind * 0.03) + time * (0.82 + wind * 0.2)) * Math.cos(z * 0.13 + time * 0.54) * amp +
+        Math.sin((z + 13) * 0.42 + time * (1.26 + wind * 0.2)) * Math.cos((x + 13) * 0.3 + time * 0.92) * amp * 0.36 +
+        Math.sin((x + z * 0.72) * (0.68 + wind * 0.05) + time * 1.56) * amp * 0.13
+      );
+    }
+
+    function readInputs() {
+      return {
+        sea: Number(ui.sea.value),
+        wind: Number(ui.wind.value),
+        rain: Number(ui.rain.value),
+        seaTemp: Number(ui.seaTemp.value),
+        airTemp: Number(ui.airTemp.value),
+        humidity: Number(ui.humidity.value),
+        pressure: Number(ui.pressure.value),
+        ductEnabled: ui.ductEnabled.checked,
+        ductStrength: Number(ui.ductStrength.value) / 100,
+        ductMixing: Number(ui.ductMixing.value),
+        ductHeightBias: Number(ui.ductHeightBias.value),
+        progress: Number(ui.track.value) / 100,
+        speed: Number(ui.speed.value),
+        freq: Number(ui.band.value),
+        model: ui.model.value,
+        tx: Number(ui.tx.value),
+        height: Number(ui.height.value),
+        bgBrightness: Number(ui.bgBrightness.value),
+        bgOpacity: Number(ui.bgOpacity.value),
+        satBackupEnabled: ui.satBackupEnabled.checked
+      };
+    }
+
+    function bandLabel(mhz) {
+      return mhz < 1000 ? `${mhz} MHz` : `${(mhz / 1000).toFixed(1)} GHz`;
+    }
+
+    function modelLabel(value) {
+      if (value === "fspl") return "自由空间";
+      if (value === "weather") return "海面 + 雨雾";
+      return "两径海面";
+    }
+
+    function saturationVaporPressure(tempC) {
+      return 6.112 * Math.exp((17.67 * tempC) / (tempC + 243.5));
+    }
+
+    function radioRefractivity(tempC, pressureHpa, vaporPressureHpa) {
+      const tempK = tempC + 273.15;
+      return 77.6 * (pressureHpa / tempK) + 3.73e5 * (vaporPressureHpa / (tempK * tempK));
+    }
+
+    function computeRefractivityProfile(input) {
+      const levels = [];
+      const surfaceE = 0.98 * saturationVaporPressure(input.seaTemp);
+      const airE = (input.humidity / 100) * saturationVaporPressure(input.airTemp);
+      const ductStrength = input.ductEnabled ? input.ductStrength : 0;
+      const humidityScale = Math.max(
+        1.2,
+        input.ductMixing + input.wind * 0.12 - Math.max(0, input.seaTemp - input.airTemp) * 0.08
+      );
+      const tempScale = Math.max(2.5, 7.5 + input.wind * 0.12);
+      for (let i = 0; i <= 90; i += 1) {
+        const z = 0.2 + i * (59.8 / 90);
+        const humidityMix = Math.exp(-z / humidityScale);
+        const tempMix = Math.exp(-z / tempScale);
+        const tempC = input.airTemp + (input.seaTemp - input.airTemp) * tempMix;
+        const saturatedAtLevel = saturationVaporPressure(tempC);
+        const gradientVapor = airE + (surfaceE - airE) * humidityMix * ductStrength;
+        const vaporPressure = Math.min(saturatedAtLevel, Math.max(0.05, gradientVapor));
+        const pressure = input.pressure * Math.exp(-z / 8434);
+        const nValue = radioRefractivity(tempC, pressure, vaporPressure);
+        const mValue = nValue + 0.157 * z;
+        levels.push({ z, tempC, vaporPressure, pressure, nValue, mValue });
+      }
+
+      let minIndex = 0;
+      for (let i = 1; i < levels.length; i += 1) {
+        if (levels[i].mValue < levels[minIndex].mValue) minIndex = i;
+      }
+      const initialGradient = (levels[2].mValue - levels[0].mValue) / (levels[2].z - levels[0].z);
+      const mDeficit = Math.max(0, levels[0].mValue - levels[minIndex].mValue);
+      const hasDuct = input.ductEnabled && initialGradient < -0.02 && minIndex > 1 && mDeficit > 0.25;
+      const calibratedEdh = hasDuct ? Math.max(0.6, Math.min(60, levels[minIndex].z + input.ductHeightBias)) : 0;
+      const calibratedDeficit = hasDuct ? Math.max(0, mDeficit * Math.sqrt(Math.max(0.15, input.ductStrength))) : 0;
+      return {
+        levels,
+        edh: calibratedEdh,
+        rawEdh: hasDuct ? levels[minIndex].z : 0,
+        mDeficit: calibratedDeficit,
+        rawMDeficit: hasDuct ? mDeficit : 0,
+        minM: levels[minIndex].mValue,
+        surfaceM: levels[0].mValue,
+        initialGradient,
+        enabled: input.ductEnabled
+      };
+    }
+
+    function computeChannelBudget(input, distanceKm, ductProfile) {
+      const freqGhz = input.freq / 1000;
+      const fspl = 32.44 + 20 * Math.log10(distanceKm) + 20 * Math.log10(input.freq);
+      const surfaceLoss = input.sea * 0.9 + input.wind * 0.075 + Math.max(0, input.speed - 12) * 0.055;
+      const weatherLoss = input.model === "weather"
+        ? input.rain * distanceKm * (0.012 + 0.018 * Math.sqrt(freqGhz))
+        : input.rain * distanceKm * 0.003;
+      const ductActive = ductProfile.edh > 0;
+      const baseCapture = ductActive ? Math.exp(-Math.max(0, input.height - ductProfile.edh) / 18) : 0;
+      const shipCapture = ductActive ? Math.exp(-Math.max(0, 4 - ductProfile.edh) / 8) : 0;
+      const freqCoupling = Math.min(1.35, Math.max(0.22, Math.sqrt(freqGhz / 2.4)));
+      const rangeCoupling = 1 - Math.exp(-distanceKm / 8);
+      const seaPenalty = Math.max(0.42, 1 - input.sea * 0.055);
+      const ductGain = ductActive
+        ? Math.min(18, ductProfile.mDeficit * 0.72 * baseCapture * shipCapture * freqCoupling * rangeCoupling * seaPenalty)
+        : 0;
+      const twoRayFade = input.model === "fspl"
+        ? 0
+        : Math.max(0, 8.5 * Math.pow(Math.sin(distanceKm * 0.74 + input.sea * 0.42 + freqGhz * 0.18 - ductGain * 0.09), 2) - 1.1);
+      const horizonKm = 3.57 * (Math.sqrt(input.height) + Math.sqrt(4));
+      const ductExtendedHorizon = horizonKm + ductGain * 1.8;
+      const horizonPenalty = distanceKm > ductExtendedHorizon ? Math.min(14, (distanceKm - ductExtendedHorizon) * 0.6) : 0;
+      const totalLoss = fspl + surfaceLoss + weatherLoss + twoRayFade + horizonPenalty - ductGain;
+      return { fspl, surfaceLoss, weatherLoss, ductGain, twoRayFade, horizonKm, ductExtendedHorizon, horizonPenalty, totalLoss };
+    }
+
+    function computeLink(input) {
+      const shipPoint = route.getPoint(input.progress);
+      const baseAntennaHeight = 5.8 + input.height / 10;
+      const baseAntenna = new THREE.Vector3(baseWorld.x, baseAntennaHeight, baseWorld.z);
+      const shipAntenna = new THREE.Vector3(shipPoint.x + 0.32, ship.position.y + 2.88, shipPoint.z);
+      const distanceKm = Math.max(0.35, baseAntenna.distanceTo(shipAntenna) * scaleKm);
+      const freqGhz = input.freq / 1000;
+      const waveM = 0.25 + input.sea * 0.32 + input.wind * 0.035;
+      const ductProfile = computeRefractivityProfile(input);
+      const budget = computeChannelBudget(input, distanceKm, ductProfile);
+      const rx = input.tx + 8 + 5 - budget.totalLoss;
+      const noise = -97 + 10 * Math.log10(freqGhz);
+      const snr = rx - noise;
+      const margin = snr - 10;
+      const packet = Math.min(55, Math.max(0.2, 0.24 + Math.exp((9 - snr) / 4.8) * 3 + input.sea * 0.2 + input.rain * 0.05));
+      return {
+        shipPoint,
+        baseAntenna,
+        shipAntenna,
+        distanceKm,
+        fspl: budget.fspl,
+        surfaceLoss: budget.surfaceLoss,
+        weatherLoss: budget.weatherLoss,
+        ductGain: budget.ductGain,
+        ductProfile,
+        twoRayFade: budget.twoRayFade,
+        horizonPenalty: budget.horizonPenalty,
+        horizonKm: budget.horizonKm,
+        ductExtendedHorizon: budget.ductExtendedHorizon,
+        totalLoss: budget.totalLoss,
+        noise,
+        rx,
+        snr,
+        margin,
+        packet,
+        waveM
+      };
+    }
+
+    function incidentLabel(value) {
+      switch (value) {
+        case "base-fault": return "基站故障";
+        case "weather-fault": return "恶劣天气";
+        case "relay-fault": return "中继失联";
+        case "ship-fault": return "船载异常";
+        default: return "无";
+      }
+    }
+
+    function resolveIncident(input, metrics) {
+      const selected = ui.incident.value || "none";
+      const baseIncident = {
+        key: "none",
+        label: "无",
+        severity: "normal",
+        title: "正常运行",
+        message: "当前网络覆盖稳定，未触发运维告警。",
+        action: "保持现有频段与链路余量观察。",
+        lossDelta: 0,
+        rxDelta: 0,
+        snrDelta: 0,
+        marginDelta: 0,
+        packetDelta: 0,
+        target: "none"
+      };
+
+      if (selected === "none") return baseIncident;
+
+      if (selected === "base-fault") {
+        return {
+          ...baseIncident,
+          key: "base-fault",
+          label: "基站故障",
+          severity: "critical",
+          title: "严重告警：岸站主链路异常",
+          message: "基站天线或电源异常导致主链路衰减增加，覆盖空洞风险明显上升。",
+          action: "立即启用备份中继或应急站，优先保障关键船舶通信。",
+          lossDelta: 12,
+          rxDelta: 10,
+          snrDelta: 7,
+          marginDelta: 8,
+          packetDelta: 5,
+          target: "base"
+        };
+      }
+
+      if (selected === "weather-fault") {
+        return {
+          ...baseIncident,
+          key: "weather-fault",
+          label: "恶劣天气",
+          severity: "warning",
+          title: "告警：暴雨与海雾影响覆盖",
+          message: "突发天气导致雨雾散射和海面反射增强，链路波动明显。",
+          action: "临时提高发射功率并引导船舶转向更稳定的覆盖区域。",
+          lossDelta: 8,
+          rxDelta: 7,
+          snrDelta: 4,
+          marginDelta: 5,
+          packetDelta: 3,
+          target: "sea"
+        };
+      }
+
+      if (selected === "relay-fault") {
+        return {
+          ...baseIncident,
+          key: "relay-fault",
+          label: "中继失联",
+          severity: "warning",
+          title: "预警：中继浮标链路异常",
+          message: "中继浮标失联后，波导辅助和多跳保护能力下降，覆盖稳定性受影响。",
+          action: "切换到直接链路或临时补设中继节点，收敛船舶通信服务。",
+          lossDelta: 6,
+          rxDelta: 6,
+          snrDelta: 3,
+          marginDelta: 4,
+          packetDelta: 2,
+          target: "relay"
+        };
+      }
+
+      return {
+        ...baseIncident,
+        key: "ship-fault",
+        label: "船载异常",
+        severity: "warning",
+        title: "预警：船载天线偏航",
+        message: "船舶天线姿态异常导致接收增益下降，链路质量有短时波动。",
+        action: "提醒船舶校正天线姿态，并优先检查设备状态。",
+        lossDelta: 5,
+        rxDelta: 5,
+        snrDelta: 3,
+        marginDelta: 3,
+        packetDelta: 2,
+        target: "ship"
+      };
+    }
+
+    function applyIncident(metrics, incident) {
+      if (incident.severity === "normal") return metrics;
+      const adjusted = { ...metrics };
+      adjusted.totalLoss = metrics.totalLoss + incident.lossDelta;
+      adjusted.rx = metrics.rx - incident.rxDelta;
+      adjusted.snr = metrics.snr - incident.snrDelta;
+      adjusted.margin = metrics.margin - incident.marginDelta;
+      adjusted.packet = Math.min(95, metrics.packet + incident.packetDelta);
+      return adjusted;
+    }
+
+    function analyzeCoverage(input, metrics, incident) {
+      const ductRangeKm = metrics.ductProfile.edh > 0
+        ? Math.max(18, 12 + metrics.ductProfile.edh * 0.9 + input.ductStrength * 24)
+        : Math.max(10, 8 + input.sea * 0.6 + input.wind * 0.15);
+      const effectiveCoverageKm = Math.max(6, Math.min(ductRangeKm, metrics.ductExtendedHorizon));
+      const nearShoreGap = input.progress < 0.18 && input.sea >= 4;
+      const gapRisk = metrics.distanceKm > effectiveCoverageKm * 0.86 || metrics.margin < 4 || (incident && incident.severity !== "normal");
+      const satBackupNeeded = input.satBackupEnabled || (gapRisk && (nearShoreGap || metrics.distanceKm > effectiveCoverageKm * 0.92));
+      const status = satBackupNeeded ? "覆盖风险" : (metrics.margin >= 8 ? "覆盖稳定" : "覆盖波动");
+      const summary = metrics.ductProfile.edh > 0
+        ? `蒸汽波导可把岸边基站的有效覆盖水平距离拉伸到约 ${ductRangeKm.toFixed(0)} km，但当船迹超出 ${effectiveCoverageKm.toFixed(0)} km 的实测边界时，仍需考虑低轨卫星补盲或改道。`
+        : `当前气象条件下，岸边基站主要依赖常规视距覆盖，若船迹逼近 ${effectiveCoverageKm.toFixed(0)} km 边界，需提前准备低轨卫星备份。`;
+      return { ductRangeKm, effectiveCoverageKm, gapRisk, satBackupNeeded, status, summary };
+    }
+
+    function linkState(metrics, incident) {
+      if (incident && incident.severity === "critical") return { key: "bad", label: "告警", color: colors.bad };
+      if (incident && incident.severity === "warning") return { key: "warn", label: "预警", color: colors.warn };
+      if (metrics.snr >= 18 && metrics.margin >= 8) return { key: "good", label: "稳定", color: colors.good };
+      if (metrics.snr >= 10) return { key: "warn", label: "波动", color: colors.warn };
+      return { key: "bad", label: "临界", color: colors.bad };
+    }
+
+    function updateLossBars(metrics) {
+      const scale = 880 / Math.max(140, metrics.totalLoss);
+      const values = {
+        fspl: metrics.fspl * scale,
+        surface: metrics.surfaceLoss * scale,
+        weather: metrics.weatherLoss * scale,
+        fade: Math.max(0, metrics.twoRayFade + metrics.horizonPenalty - metrics.ductGain) * scale
+      };
+      let x = 0;
+      for (const key of ["fspl", "surface", "weather", "fade"]) {
+        bars[key].setAttribute("x", String(x));
+        bars[key].setAttribute("width", String(Math.max(0, values[key])));
+        x += values[key];
+      }
+      bars.duct.setAttribute("x", String(Math.max(0, x - metrics.ductGain * scale)));
+      bars.duct.setAttribute("width", String(Math.max(0, metrics.ductGain * scale)));
+      out.barTotal.textContent = `总损耗 ${Math.round(metrics.totalLoss)} dB`;
+      out.barBudget.textContent = `链路余量 ${Math.round(metrics.margin)} dB`;
+    }
+
+    function updateProfileChart(profile) {
+      const levels = profile.levels;
+      const minM = Math.min(...levels.map((level) => level.mValue));
+      const maxM = Math.max(...levels.map((level) => level.mValue));
+      const spanM = Math.max(1, maxM - minM);
+      const xOf = (mValue) => 52 + ((mValue - minM) / spanM) * 838;
+      const yOf = (z) => 122 - (z / 60) * 104;
+      const path = levels.map((level, index) => {
+        const prefix = index === 0 ? "M" : "L";
+        return `${prefix}${xOf(level.mValue).toFixed(1)},${yOf(level.z).toFixed(1)}`;
+      }).join(" ");
+      out.profilePath.setAttribute("d", path);
+      const edhY = yOf(profile.edh);
+      const edhX = xOf(profile.minM);
+      out.edhLine.setAttribute("y1", String(edhY));
+      out.edhLine.setAttribute("y2", String(edhY));
+      out.edhMarker.setAttribute("cx", String(edhX));
+      out.edhMarker.setAttribute("cy", String(edhY));
+      out.edhLine.style.opacity = profile.edh > 0 ? "1" : "0.18";
+      out.edhMarker.style.opacity = profile.edh > 0 ? "1" : "0.18";
+      out.profileInfo.textContent = profile.enabled
+        ? (profile.edh > 0
+          ? `EDH ${profile.edh.toFixed(1)} m，M 缺陷 ${profile.mDeficit.toFixed(1)} M`
+          : `未形成明显蒸发波导，dM/dz ${profile.initialGradient.toFixed(2)} M/m`)
+        : `蒸汽波导关闭，dM/dz ${profile.initialGradient.toFixed(2)} M/m`;
+    }
+
+    function updateChannelChart(input, metrics) {
+      const ductProfile = metrics.ductProfile;
+      const samples = [];
+      for (let i = 0; i <= 72; i += 1) {
+        const distance = 0.5 + i * (29.5 / 72);
+        const budget = computeChannelBudget(input, distance, ductProfile);
+        samples.push({ distance, fspl: budget.fspl, total: budget.totalLoss });
+      }
+      const minLoss = Math.min(...samples.map((sample) => Math.min(sample.fspl, sample.total))) - 3;
+      const maxLoss = Math.max(...samples.map((sample) => Math.max(sample.fspl, sample.total))) + 4;
+      const lossSpan = Math.max(1, maxLoss - minLoss);
+      const xOf = (distance) => 54 + ((distance - 0.5) / 29.5) * 836;
+      const yOf = (loss) => 132 - ((loss - minLoss) / lossSpan) * 114;
+      const makePath = (key) => samples.map((sample, index) => {
+        const prefix = index === 0 ? "M" : "L";
+        return `${prefix}${xOf(sample.distance).toFixed(1)},${yOf(sample[key]).toFixed(1)}`;
+      }).join(" ");
+      out.channelFsplPath.setAttribute("d", makePath("fspl"));
+      out.channelTotalPath.setAttribute("d", makePath("total"));
+      out.channelPoint.setAttribute("cx", String(xOf(metrics.distanceKm)));
+      out.channelPoint.setAttribute("cy", String(yOf(metrics.totalLoss)));
+      out.channelInfo.textContent = `当前 ${metrics.distanceKm.toFixed(1)} km：${Math.round(metrics.totalLoss)} dB`;
+    }
+
+    function updateSignalMonitor(metrics, state) {
+      const spectralEfficiency = Math.max(0, Math.min(6, Math.log2(1 + Math.pow(10, metrics.snr / 10))));
+      const rateMbps = Math.max(0.1, spectralEfficiency * 3.2 * (1 - metrics.packet / 100));
+      out.monitorSummary.textContent = `当前链路${state.label}，接收功率 ${Math.round(metrics.rx)} dBm`;
+      out.monitorRssi.textContent = `${Math.round(metrics.rx)} dBm`;
+      out.monitorSnr.textContent = `${Math.round(metrics.snr)} dB`;
+      out.monitorMargin.textContent = `${Math.round(metrics.margin)} dB`;
+      out.monitorNoise.textContent = `${Math.round(metrics.noise)} dBm`;
+      out.monitorPacket.textContent = `${metrics.packet < 10 ? metrics.packet.toFixed(1) : Math.round(metrics.packet)}%`;
+      out.monitorRate.textContent = `${rateMbps.toFixed(1)} Mbps`;
+    }
+
+    function updateUi(input, metrics, state, incident, coverage) {
+      out.sea.textContent = `${input.sea} 级`;
+      out.wind.textContent = `${input.wind} m/s`;
+      out.rain.textContent = `${input.rain} mm/h`;
+      out.seaTemp.textContent = `${input.seaTemp.toFixed(1)} °C`;
+      out.airTemp.textContent = `${input.airTemp.toFixed(1)} °C`;
+      out.humidity.textContent = `${input.humidity}%`;
+      out.pressure.textContent = `${input.pressure} hPa`;
+      out.ductControlSummary.textContent = input.ductEnabled ? `已启用 / ${Math.round(input.ductStrength * 100)}%` : "已关闭";
+      out.ductStrength.textContent = `${Math.round(input.ductStrength * 100)}%`;
+      out.ductMixing.textContent = `${input.ductMixing.toFixed(1)} m`;
+      out.ductHeightBias.textContent = `${input.ductHeightBias > 0 ? "+" : ""}${input.ductHeightBias} m`;
+      out.track.textContent = `${Math.round(input.progress * 100)}%`;
+      out.speed.textContent = `${input.speed} kn`;
+      out.band.textContent = bandLabel(input.freq);
+      out.model.textContent = modelLabel(input.model);
+      out.modelSummary.textContent = modelLabel(input.model);
+      out.tx.textContent = `${input.tx} dBm`;
+      out.height.textContent = `${input.height} m`;
+      out.distance.textContent = `${metrics.distanceKm.toFixed(1)} km`;
+      out.horizon.textContent = `无线视距 ${metrics.ductExtendedHorizon.toFixed(0)} km`;
+      out.loss.textContent = `${Math.round(metrics.totalLoss)} dB`;
+      out.lossDetail.textContent = input.model === "fspl" ? "自由空间 + 波导修正" : input.model === "weather" ? "海面反射 + 雨雾 + 波导" : "自由空间 + 两径海面 + 波导";
+      out.rx.textContent = `${Math.round(metrics.rx)} dBm`;
+      out.snr.textContent = `SNR ${Math.round(metrics.snr)} dB`;
+      out.quality.textContent = state.label;
+      out.packet.textContent = `丢包估计 ${metrics.packet < 10 ? metrics.packet.toFixed(1) : Math.round(metrics.packet)}%`;
+      out.waveSummary.textContent = `浪高 ${metrics.waveM.toFixed(1)} m / ${metrics.ductProfile.enabled ? `EDH ${metrics.ductProfile.edh.toFixed(1)} m` : "波导关闭"}`;
+      out.ductMetric.textContent = metrics.ductProfile.enabled
+        ? (metrics.ductProfile.edh > 0 ? `EDH ${metrics.ductProfile.edh.toFixed(1)} m` : "未形成波导")
+        : "波导关闭";
+      out.ductGain.textContent = metrics.ductProfile.enabled
+        ? `M 缺陷 ${metrics.ductProfile.mDeficit.toFixed(1)} M，传播修正 ${metrics.ductGain.toFixed(1)} dB`
+        : "仅按普通海面传播计算";
+      out.linkState.lastElementChild.textContent = `链路${state.label}`;
+      out.linkState.querySelector(".dot").style.background = state.color.getStyle();
+      out.miniShip.setAttribute("cx", String(22 + input.progress * 278));
+      out.miniShip.setAttribute("cy", String(76 - Math.sin(input.progress * Math.PI) * 46 - input.progress * 10));
+      out.simClock.lastElementChild.textContent = new Date(Math.floor(clock.elapsedTime) * 1000).toISOString().substring(14, 19);
+      out.bgBrightness.textContent = `${input.bgBrightness}%`;
+      out.bgOpacity.textContent = `${input.bgOpacity}%`;
+      out.backgroundSummary.textContent = `亮度 ${input.bgBrightness}% / 透明 ${input.bgOpacity}%`;
+      out.incidentSummary.textContent = incident.title;
+      out.incidentTypeValue.textContent = incident.label;
+      out.alertTitle.textContent = incident.title;
+      out.alertSeverity.textContent = incident.severity === "critical" ? "严重" : incident.severity === "warning" ? "警告" : "正常";
+      out.alertMessage.textContent = `${incident.message} ${coverage.summary}`;
+      out.alertAction.textContent = `${coverage.satBackupNeeded ? "建议：启用低轨卫星备份，并将船舶引导至更稳定覆盖区域。" : `建议：${incident.action}`}`;
+      out.sceneAlertTitle.textContent = incident.title;
+      out.sceneAlertText.textContent = `${incident.message} ${coverage.summary}`;
+      out.coverageStatusLabel.textContent = `覆盖状态：${coverage.status}`;
+      out.coverageRangeLabel.textContent = `波导水平距离：${coverage.ductRangeKm.toFixed(0)} km / 有效覆盖：${coverage.effectiveCoverageKm.toFixed(0)} km`;
+      out.backupLabel.textContent = coverage.satBackupNeeded ? "低轨卫星备份：建议启用" : "低轨卫星备份：暂不需要";
+      const toneClass = incident.severity === "critical" ? "critical" : incident.severity === "warning" ? "warning" : "";
+      out.alertCard.className = `alert-card ${toneClass}`.trim();
+      out.alertSeverity.className = `alert-pill ${toneClass}`.trim();
+      out.sceneAlert.className = `scene-alert ${toneClass}`.trim();
+      shell.style.setProperty("--bg-brightness", String(input.bgBrightness / 100));
+      shell.style.setProperty("--bg-opacity", String(input.bgOpacity / 100));
+      updateLossBars(metrics);
+      updateProfileChart(metrics.ductProfile);
+      updateChannelChart(input, metrics);
+      updateSignalMonitor(metrics, state);
+    }
+
+    function updateGeometry(input, metrics, state, time, incident, coverage) {
+      const windNorm = input.wind / 28;
+      const waveAmp = 0.22 + input.sea * 0.16 + input.wind * 0.018;
+      oceanMaterial.uniforms.time.value = time;
+      oceanMaterial.uniforms.amp.value = waveAmp;
+      oceanMaterial.uniforms.wind.value = windNorm;
+      ductMaterial.uniforms.time.value = time;
+      ductMaterial.uniforms.opacity.value = metrics.ductProfile.edh > 0 ? Math.min(0.48, 0.12 + metrics.ductProfile.mDeficit / 34) : 0;
+      ductLayer.position.y = 0.35 + metrics.ductProfile.edh / 10;
+      ductLayer.scale.y = Math.max(0.08, metrics.ductProfile.edh / 18);
+
+      base.userData.heightMarker.scale.y = Math.max(0.7, input.height / 10);
+      base.userData.heightMarker.position.y = 5.8 + base.userData.heightMarker.scale.y * 0.5;
+
+      const shipPoint = metrics.shipPoint;
+      const bob = waveHeight(shipPoint.x, shipPoint.z, time, waveAmp, windNorm);
+      const tangent = route.getTangent(input.progress);
+      const heading = Math.atan2(tangent.x, tangent.z);
+      ship.position.set(shipPoint.x, 0.48 + bob, shipPoint.z);
+      ship.rotation.set(
+        Math.cos(time * 1.1) * 0.025 * (input.sea + 1),
+        heading,
+        Math.sin(time * 1.3) * 0.038 * (input.sea + 1)
+      );
+
+      buoyA.position.y = 0.42 + waveHeight(buoyAPos.x, buoyAPos.z, time, waveAmp, windNorm);
+      buoyB.position.y = 0.38 + waveHeight(buoyBPos.x, buoyBPos.z, time, waveAmp, windNorm);
+      buoyA.rotation.z = Math.sin(time * 1.18) * 0.03 * (input.sea + 1);
+      buoyB.rotation.z = Math.sin(time * 1.08 + 0.6) * 0.028 * (input.sea + 1);
+
+      const shipTop = new THREE.Vector3(ship.position.x + 0.32, ship.position.y + 2.88, ship.position.z);
+      mainCurve = makeCurve(metrics.baseAntenna, shipTop, 5.9);
+      mainLink.geometry.setFromPoints(mainCurve.getPoints(72));
+      const linkColor = incident.severity === "critical" ? colors.bad : incident.severity === "warning" ? colors.warn : state.color;
+      materials.direct.color.copy(linkColor);
+      pulseMaterial.color.copy(linkColor);
+      buoyLinkA.geometry.setFromPoints(makeCurve(metrics.baseAntenna, new THREE.Vector3(buoyA.position.x, buoyA.position.y + 3.4, buoyA.position.z), 4.8).getPoints(48));
+      buoyLinkB.geometry.setFromPoints(makeCurve(metrics.baseAntenna, new THREE.Vector3(buoyB.position.x, buoyB.position.y + 3.0, buoyB.position.z), 4.8).getPoints(48));
+
+      const showCoverageRisk = incident.severity !== "normal" || coverage.gapRisk;
+      if (showCoverageRisk) {
+        let targetPosition;
+        if (incident.severity !== "normal" && incident.target === "base") {
+          targetPosition = new THREE.Vector3(baseWorld.x, 4.2, baseWorld.z);
+        } else if (incident.severity !== "normal" && incident.target === "relay") {
+          targetPosition = new THREE.Vector3(buoyA.position.x, buoyA.position.y + 2.6, buoyA.position.z);
+        } else if (incident.severity !== "normal" && incident.target === "ship") {
+          targetPosition = new THREE.Vector3(ship.position.x, ship.position.y + 2.1, ship.position.z);
+        } else {
+          targetPosition = new THREE.Vector3(ship.position.x, 0.9, ship.position.z);
+        }
+        incidentHalo.visible = true;
+        incidentHalo.position.copy(targetPosition);
+        incidentHalo.material.color.copy(linkColor);
+        incidentHalo.material.opacity = 0.72 + Math.sin(time * 3.2) * 0.12;
+        incidentHalo.scale.setScalar(1 + Math.sin(time * 2.6) * 0.12);
+      } else {
+        incidentHalo.visible = false;
+      }
+
+      history.push(ship.position.clone().setY(0.18));
+      if (history.length > 90) history.shift();
+      if (history.length > 1) historyLine.geometry.setFromPoints(history);
+
+      pulses.forEach((pulse, index) => {
+        const t = (time * 0.34 + index / pulses.length) % 1;
+        pulse.position.copy(mainCurve.getPoint(t));
+        pulse.scale.setScalar(0.82 + Math.sin((t + time) * Math.PI * 2) * 0.16);
+      });
+    }
+
+    function projectLabel(vector, element) {
+      const width = shell.clientWidth;
+      const height = shell.clientHeight;
+      const p = vector.clone().project(camera);
+      const visible = p.z > -1 && p.z < 1;
+      element.classList.toggle("hidden", !visible);
+      if (!visible) return;
+      element.style.left = `${Math.min(width - 48, Math.max(48, (p.x * 0.5 + 0.5) * width))}px`;
+      element.style.top = `${Math.min(height - 20, Math.max(20, (-p.y * 0.5 + 0.5) * height))}px`;
+    }
+
+    function resize() {
+      const rect = shell.getBoundingClientRect();
+      const width = Math.max(1, Math.floor(rect.width));
+      const height = Math.max(1, Math.floor(rect.height));
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    }
+
+    new ResizeObserver(resize).observe(shell);
+    window.addEventListener("resize", resize);
+    resize();
+
+    function refreshScene(input, incidentOverride) {
+      const metrics = computeLink(input);
+      const incident = incidentOverride || resolveIncident(input, metrics);
+      const resolvedMetrics = applyIncident(metrics, incident);
+      const coverage = analyzeCoverage(input, resolvedMetrics, incident);
+      const state = linkState(resolvedMetrics, incident);
+      updateGeometry(input, resolvedMetrics, state, clock.elapsedTime, incident, coverage);
+      updateUi(input, resolvedMetrics, state, incident, coverage);
+    }
+
+    for (const control of [ui.sea, ui.wind, ui.rain, ui.seaTemp, ui.airTemp, ui.humidity, ui.pressure, ui.ductEnabled, ui.ductStrength, ui.ductMixing, ui.ductHeightBias, ui.track, ui.speed, ui.band, ui.model, ui.tx, ui.height, ui.bgBrightness, ui.bgOpacity, ui.incident]) {
+      control.addEventListener("input", () => {
+        const input = readInputs();
+        refreshScene(input);
+      });
+      control.addEventListener("change", () => {
+        const input = readInputs();
+        refreshScene(input);
+      });
+    }
+
+    ui.applyIncident.addEventListener("click", () => {
+      const input = readInputs();
+      refreshScene(input, resolveIncident(input, computeLink(input)));
+    });
+
+    ui.clearIncident.addEventListener("click", () => {
+      ui.incident.value = "none";
+      const input = readInputs();
+      refreshScene(input, resolveIncident(input, computeLink(input)));
+    });
+
+    ui.play.addEventListener("click", () => {
+      const nextRunning = ui.play.dataset.running === "false";
+      ui.play.dataset.running = String(nextRunning);
+      ui.play.textContent = nextRunning ? "暂停" : "运行";
+      ui.play.classList.toggle("primary", nextRunning);
+    });
+
+    ui.reset.addEventListener("click", () => {
+      camera.position.set(22, 18, 32);
+      orbit.target.set(2, 0.8, 0);
+      orbit.update();
+    });
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function animate() {
+      const delta = clock.getDelta();
+      const time = clock.elapsedTime;
+      let input = readInputs();
+      if (ui.play.dataset.running !== "false" && !reducedMotion) {
+        const next = (input.progress + delta * input.speed * 0.00095) % 1;
+        ui.track.value = String(Math.round(next * 100));
+        input = readInputs();
+      }
+      const metrics = computeLink(input);
+      const incident = resolveIncident(input, metrics);
+      const resolvedMetrics = applyIncident(metrics, incident);
+      const coverage = analyzeCoverage(input, resolvedMetrics, incident);
+      const state = linkState(resolvedMetrics, incident);
+      updateGeometry(input, resolvedMetrics, state, time, incident, coverage);
+      updateUi(input, resolvedMetrics, state, incident, coverage);
+      orbit.update();
+      projectLabel(new THREE.Vector3(baseWorld.x, 6.9 + input.height / 10, baseWorld.z), labels.base);
+      projectLabel(new THREE.Vector3(buoyA.position.x, buoyA.position.y + 4.1, buoyA.position.z), labels.buoyA);
+      projectLabel(new THREE.Vector3(buoyB.position.x, buoyB.position.y + 3.7, buoyB.position.z), labels.buoyB);
+      projectLabel(new THREE.Vector3(ship.position.x, ship.position.y + 3.8, ship.position.z), labels.ship);
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
