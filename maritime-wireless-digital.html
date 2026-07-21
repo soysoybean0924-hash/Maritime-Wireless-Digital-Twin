@@ -43,6 +43,7 @@
     .app {
       display: grid;
       grid-template-rows: auto minmax(430px, 1fr) auto;
+      grid-auto-rows: auto;
       gap: 12px;
       width: min(1440px, 100%);
       min-height: 100vh;
@@ -255,10 +256,17 @@
     .alert-card {
       display: grid;
       gap: 8px;
+      min-width: 0;
       padding: 10px;
       border: 1px solid var(--line);
       border-radius: 10px;
       background: rgb(255 255 255 / 4%);
+      overflow-wrap: anywhere;
+    }
+
+    .alert-card strong,
+    .alert-card div {
+      min-width: 0;
     }
 
     .alert-card.warning {
@@ -304,6 +312,7 @@
     .operator-actions {
       display: grid;
       gap: 4px;
+      min-width: 0;
       padding: 8px;
       border: 1px dashed var(--line);
       border-radius: 8px;
@@ -311,11 +320,12 @@
       background: rgb(255 255 255 / 3%);
       font-size: 12px;
       line-height: 1.45;
+      overflow-wrap: anywhere;
     }
 
     .side {
       display: grid;
-      gap: 12px;
+      gap: 14px;
       padding: 12px;
       align-content: start;
       overflow: auto;
@@ -324,6 +334,14 @@
     .control-group {
       display: grid;
       gap: 10px;
+      min-width: 0;
+      padding: 0 0 14px;
+      border-bottom: 1px solid rgb(255 255 255 / 8%);
+    }
+
+    .control-group:last-child {
+      padding-bottom: 0;
+      border-bottom: 0;
     }
 
     .group-title {
@@ -331,8 +349,21 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
+      min-width: 0;
       color: var(--muted);
       font-size: 13px;
+    }
+
+    .group-title span:first-child {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .group-title span:last-child {
+      flex: 0 1 auto;
+      max-width: 58%;
+      text-align: right;
+      overflow-wrap: anywhere;
     }
 
     label {
@@ -347,6 +378,12 @@
       align-items: baseline;
       justify-content: space-between;
       gap: 8px;
+      min-width: 0;
+    }
+
+    .label-line span:first-child {
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
 
     .value {
@@ -388,6 +425,7 @@
       background: rgb(255 255 255 / 4%);
       font-size: 12px;
       line-height: 1.5;
+      overflow-wrap: anywhere;
     }
 
     select {
@@ -425,6 +463,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
       gap: 12px;
+      align-items: stretch;
     }
 
     .metric {
@@ -448,12 +487,14 @@
     .metric small {
       color: var(--muted);
       font-size: 12px;
+      overflow-wrap: anywhere;
     }
 
     .loss-panel,
     .channel-panel {
       display: grid;
-      gap: 8px;
+      gap: 10px;
+      min-width: 0;
       padding: 12px;
     }
 
@@ -466,12 +507,21 @@
 
     .profile-panel {
       display: grid;
-      gap: 8px;
+      gap: 10px;
+      min-width: 0;
       padding: 12px;
     }
 
     .profile-panel svg {
       height: 148px;
+    }
+
+    .channel-panel {
+      margin-top: 2px;
+    }
+
+    .profile-panel {
+      margin-top: 2px;
     }
 
     .legend {
@@ -486,6 +536,9 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
     }
 
     .monitor-grid {
