@@ -345,13 +345,13 @@
     #dashboard-shell {
       order: 2;
       min-height: 0;
-      padding: 9px 14px 12px;
+      padding: 8px 12px 10px;
       display: grid;
       grid-template-columns: minmax(180px, 0.75fr) minmax(190px, 0.8fr) minmax(210px, 0.85fr) minmax(250px, 1fr) minmax(290px, 1.15fr) minmax(180px, 0.75fr);
       grid-template-areas:
         "info alert tuning ops analysis bs"
         "hint export env ops analysis duct";
-      gap: 9px;
+      gap: 8px;
       align-items: start;
       background:
         linear-gradient(180deg, rgba(18, 55, 76, 0.92) 0%, rgba(10, 34, 50, 0.96) 100%);
@@ -468,12 +468,27 @@
       accent-color: #4fc3f7;
     }
 
+    #dashboard-shell #info-panel,
+    #dashboard-shell #ops-panel,
+    #dashboard-shell #bs-panel,
+    #dashboard-shell #analysis-panel,
+    #dashboard-shell #duct-panel,
+    #dashboard-shell #env-panel,
+    #dashboard-shell #tuning-panel {
+      padding: 9px 11px;
+    }
+
+    #analysis-panel canvas {
+      max-height: 134px;
+      object-fit: contain;
+    }
+
     #scene-root {
       position: relative;
       order: 1;
-      height: 43vh;
-      min-height: 380px;
-      max-height: 500px;
+      height: 55vh;
+      min-height: 500px;
+      max-height: 680px;
       overflow: hidden;
       background:
         linear-gradient(180deg, #7aa7e7 0%, #b9dfe8 46%, #d5edf0 62%, #b4d9e3 100%);
@@ -526,8 +541,8 @@
       }
 
       #scene-root {
-        min-height: 360px;
-        height: 44vh;
+        min-height: 430px;
+        height: 54vh;
       }
     }
   </style>
@@ -1980,7 +1995,7 @@
 
     // 相机
     const camera = new THREE.PerspectiveCamera(55, sceneSize.width / sceneSize.height, 1, 800);
-    camera.position.set(60, 35, 80);
+    camera.position.set(48, 30, 62);
     camera.lookAt(0, 0, 0);
 
     // 轨道控制器
@@ -1990,7 +2005,7 @@
     controls.dampingFactor = 0.08;
     controls.enableZoom = false; // 使用自定义平滑滚轮缩放，避免远近档位式跳变
     controls.minDistance = 15;
-    controls.maxDistance = 250;
+    controls.maxDistance = 220;
     controls.maxPolarAngle = Math.PI * 0.48; // 限制低于水平线
     controls.update();
 
@@ -3970,7 +3985,7 @@
           boatGroup.position.x += speed;
           break;
         case 'r':
-          camera.position.set(60, 35, 80);
+          camera.position.set(48, 30, 62);
           controls.target.set(0, 3, -10);
           syncSmoothZoomTarget();
           controls.update();
