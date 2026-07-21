@@ -8,9 +8,11 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       min-height: 100vh;
+      display: flex;
+      flex-direction: column;
       overflow: auto;
       background:
-        linear-gradient(180deg, #75a8e8 0%, #b9e4f0 42%, #d6eef2 58%, #071018 58%, #071018 100%);
+        linear-gradient(180deg, #75a8e8 0%, #b9e4f0 44%, #d6eef2 58%, #071018 58%, #071018 100%);
       font-family: 'Microsoft YaHei', sans-serif;
     }
     canvas { display: block; }
@@ -341,19 +343,18 @@
     }
 
     #dashboard-shell {
-      min-height: 48vh;
-      padding: 16px 20px;
+      order: 2;
+      min-height: 0;
+      padding: 9px 14px 12px;
       display: grid;
-      grid-template-columns: minmax(260px, 1.05fr) minmax(280px, 1fr) minmax(360px, 1.25fr) minmax(220px, 0.85fr);
+      grid-template-columns: minmax(180px, 0.75fr) minmax(190px, 0.8fr) minmax(210px, 0.85fr) minmax(250px, 1fr) minmax(290px, 1.15fr) minmax(180px, 0.75fr);
       grid-template-areas:
-        "info alert alert bs"
-        "info ops analysis duct"
-        "tuning ops analysis env"
-        "hint ops export env";
-      gap: 14px;
+        "info alert tuning ops analysis bs"
+        "hint export env ops analysis duct";
+      gap: 9px;
       align-items: start;
       background:
-        linear-gradient(180deg, rgba(117, 168, 232, 0.96) 0%, rgba(186, 226, 239, 0.92) 58%, rgba(55, 129, 176, 0.78) 100%);
+        linear-gradient(180deg, rgba(18, 55, 76, 0.92) 0%, rgba(10, 34, 50, 0.96) 100%);
     }
 
     #info-panel,
@@ -374,6 +375,50 @@
       max-height: none;
       margin: 0;
       overflow-wrap: anywhere;
+    }
+
+    #dashboard-shell #info-panel,
+    #dashboard-shell #ops-panel,
+    #dashboard-shell #bs-panel,
+    #dashboard-shell #analysis-panel,
+    #dashboard-shell #duct-panel,
+    #dashboard-shell #env-panel,
+    #dashboard-shell #tuning-panel {
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 11px;
+    }
+
+    #dashboard-shell h2 {
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+
+    #dashboard-shell h3 {
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    #info-panel .section-title {
+      margin: 7px 0 3px 0;
+      padding-top: 6px;
+    }
+
+    #ops-panel .ops-message {
+      margin: 6px 0;
+      padding-top: 6px;
+      line-height: 1.35;
+    }
+
+    #analysis-panel {
+      gap: 6px;
+    }
+
+    #controls-hint,
+    #export-hint,
+    #scene-alert {
+      padding: 7px 12px;
+      font-size: 12px;
     }
 
     #info-panel { grid-area: info; }
@@ -425,8 +470,10 @@
 
     #scene-root {
       position: relative;
-      height: 72vh;
-      min-height: 620px;
+      order: 1;
+      height: 43vh;
+      min-height: 380px;
+      max-height: 500px;
       overflow: hidden;
       background:
         linear-gradient(180deg, #7aa7e7 0%, #b9dfe8 46%, #d5edf0 62%, #b4d9e3 100%);
@@ -452,8 +499,8 @@
       #dashboard-shell {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         grid-template-areas:
-          "alert alert"
           "info bs"
+          "alert alert"
           "tuning ops"
           "analysis duct"
           "analysis env"
@@ -479,8 +526,8 @@
       }
 
       #scene-root {
-        min-height: 520px;
-        height: 68vh;
+        min-height: 360px;
+        height: 44vh;
       }
     }
   </style>
