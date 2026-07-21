@@ -62,9 +62,10 @@
     /* 运营告警面板 */
     #ops-panel {
       position: absolute;
-      top: 300px;
-      left: 20px;
-      width: 300px;
+      top: 82px;
+      left: 330px;
+      width: 320px;
+      max-height: calc(100vh - 124px);
       background: rgba(10, 18, 24, 0.84);
       color: #fff;
       padding: 14px 16px;
@@ -73,6 +74,8 @@
       pointer-events: auto;
       backdrop-filter: blur(10px);
       font-size: 12px;
+      overflow: auto;
+      overflow-wrap: anywhere;
     }
     #ops-panel h3 {
       font-size: 14px;
@@ -85,12 +88,14 @@
       gap: 8px;
       margin: 4px 0;
       align-items: center;
+      min-width: 0;
     }
     #ops-panel .ops-label { color: #90a4ae; }
     #ops-panel .ops-value {
       color: #e0f7fa;
       text-align: right;
       font-family: 'Consolas', monospace;
+      overflow-wrap: anywhere;
     }
     #ops-panel .ops-message {
       margin: 8px 0;
@@ -222,7 +227,7 @@
     /* 蒸发波导面板 */
     #duct-panel {
       position: absolute;
-      bottom: 80px;
+      bottom: 178px;
       right: 20px;
       background: rgba(0, 0, 0, 0.75);
       color: #fff;
@@ -232,7 +237,9 @@
       pointer-events: none;
       backdrop-filter: blur(10px);
       font-size: 12px;
-      max-width: 200px;
+      width: 220px;
+      max-width: 220px;
+      overflow-wrap: anywhere;
     }
     #duct-panel h3 {
       font-size: 13px;
@@ -242,10 +249,12 @@
     #duct-panel .duct-row {
       display: flex;
       justify-content: space-between;
+      gap: 10px;
       margin: 2px 0;
+      min-width: 0;
     }
     #duct-panel .duct-label { color: #a0a0a0; }
-    #duct-panel .duct-value { color: #ffcc80; font-family: 'Consolas', monospace; }
+    #duct-panel .duct-value { color: #ffcc80; font-family: 'Consolas', monospace; text-align: right; overflow-wrap: anywhere; }
 
     /* 环境参数面板 */
     #env-panel {
@@ -260,7 +269,9 @@
       pointer-events: none;
       backdrop-filter: blur(10px);
       font-size: 11px;
-      max-width: 200px;
+      width: 220px;
+      max-width: 220px;
+      overflow-wrap: anywhere;
     }
     #env-panel h3 {
       font-size: 12px;
@@ -270,16 +281,21 @@
     #env-panel .env-row {
       display: flex;
       justify-content: space-between;
+      gap: 10px;
       margin: 1px 0;
+      min-width: 0;
     }
     #env-panel .env-label { color: #90a4ae; }
-    #env-panel .env-value { color: #e0e0e0; font-family: 'Consolas', monospace; }
+    #env-panel .env-value { color: #e0e0e0; font-family: 'Consolas', monospace; text-align: right; overflow-wrap: anywhere; }
 
     /* 信道分析面板 */
     #analysis-panel {
       position: absolute;
       bottom: 20px;
       left: 20px;
+      width: 386px;
+      max-width: calc(100vw - 720px);
+      max-height: calc(100vh - 40px);
       background: rgba(0, 0, 0, 0.78);
       color: #fff;
       padding: 10px 12px;
@@ -290,6 +306,8 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
+      overflow: hidden;
+      overflow-wrap: anywhere;
     }
     #analysis-panel h3 {
       font-size: 12px;
@@ -297,6 +315,8 @@
       margin: 0;
     }
     #analysis-panel canvas {
+      width: 100%;
+      height: auto;
       border-radius: 4px;
       border: 1px solid rgba(255,255,255,0.08);
     }
@@ -312,6 +332,56 @@
       font-size: 11px;
       pointer-events: none;
       backdrop-filter: blur(10px);
+    }
+
+    @media (max-width: 1180px) {
+      #ops-panel {
+        top: 300px;
+        left: 20px;
+        width: 300px;
+        max-height: calc(100vh - 690px);
+      }
+
+      #analysis-panel {
+        max-width: 360px;
+      }
+    }
+
+    @media (max-width: 920px), (max-height: 760px) {
+      body {
+        overflow: auto;
+      }
+
+      #info-panel,
+      #scene-alert,
+      #ops-panel,
+      #bs-panel,
+      #analysis-panel,
+      #duct-panel,
+      #env-panel,
+      #controls-hint,
+      #export-hint {
+        position: relative;
+        inset: auto;
+        left: auto;
+        right: auto;
+        top: auto;
+        bottom: auto;
+        transform: none;
+        width: min(420px, calc(100vw - 40px));
+        max-width: calc(100vw - 40px);
+        max-height: none;
+        margin: 12px 20px;
+      }
+
+      #scene-alert {
+        min-width: 0;
+        text-align: left;
+      }
+
+      #analysis-panel {
+        overflow: visible;
+      }
     }
   </style>
 </head>
