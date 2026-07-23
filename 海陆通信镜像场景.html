@@ -241,7 +241,7 @@
 
     const labels = [
       { element: document.getElementById("baseLabel"), position: new THREE.Vector3(-32, 15.8, -10) },
-      { element: document.getElementById("ductLabel"), position: new THREE.Vector3(20, 7, -18) },
+      { element: document.getElementById("ductLabel"), position: new THREE.Vector3(20, 16.6, -18) },
       { element: document.getElementById("shipLabel"), position: new THREE.Vector3(31, 5.8, 13) }
     ];
 
@@ -313,37 +313,48 @@
       vertexShader: `
         varying float vWave;
         varying vec2 vUv;
+        varying vec3 vWorld;
         uniform float time;
         uniform float amp;
         void main() {
           vUv = uv;
           vec3 pos = position;
-          float w1 = sin(pos.x * 0.18 + time * 0.9) * cos(pos.z * 0.12 + time * 0.54) * amp;
-          float w2 = sin((pos.x + pos.z) * 0.45 + time * 1.7) * amp * 0.22;
-          float w3 = cos(pos.z * 0.62 - time * 1.2) * amp * 0.12;
-          pos.y += w1 + w2 + w3;
+          float swell = sin(pos.x * 0.12 + pos.z * 0.05 + time * 0.58) * amp * 0.72;
+          float cross = sin(pos.x * 0.31 - pos.z * 0.18 + time * 1.24) * amp * 0.22;
+          float chop = sin((pos.x + pos.z) * 0.74 + time * 2.05) * amp * 0.09;
+          float longRoll = cos(pos.z * 0.09 - time * 0.38) * amp * 0.34;
+          pos.y += swell + cross + chop + longRoll;
           vWave = pos.y;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+          vec4 world = modelMatrix * vec4(pos, 1.0);
+          vWorld = world.xyz;
+          gl_Position = projectionMatrix * viewMatrix * world;
         }
       `,
       fragmentShader: `
         varying float vWave;
         varying vec2 vUv;
+        varying vec3 vWorld;
         uniform vec3 deep;
         uniform vec3 sea;
         uniform vec3 foam;
         void main() {
-          float heightMix = smoothstep(-1.4, 1.8, vWave);
-          float fine = sin(vUv.x * 360.0) * sin(vUv.y * 260.0) * 0.04;
-          float crest = smoothstep(0.8, 1.55, vWave);
-          vec3 color = mix(deep, sea, heightMix + fine);
-          color = mix(color, foam, crest * 0.46);
-          gl_FragColor = vec4(color, 0.84);
+          float heightMix = smoothstep(-1.55, 1.95, vWave);
+          float distanceTint = smoothstep(-18.0, 45.0, vWorld.x);
+          float fineA = sin(vUv.x * 520.0 + vWorld.z * 0.36);
+          float fineB = sin(vUv.y * 430.0 - vWorld.x * 0.22);
+          float microRipple = fineA * fineB * 0.025;
+          float crest = smoothstep(0.74, 1.5, vWave);
+          float glint = pow(max(0.0, sin(vUv.x * 42.0 + vUv.y * 21.0)), 16.0) * 0.22;
+          vec3 shallow = mix(sea, vec3(0.42, 0.82, 0.88), 0.38);
+          vec3 color = mix(deep, shallow, heightMix * 0.75 + distanceTint * 0.28 + microRipple);
+          color = mix(color, foam, crest * 0.34);
+          color += vec3(0.55, 0.82, 0.9) * glint * (0.35 + crest);
+          gl_FragColor = vec4(color, 0.88);
         }
       `
     });
 
-    const oceanGeometry = new THREE.PlaneGeometry(118, 86, 190, 138);
+    const oceanGeometry = new THREE.PlaneGeometry(118, 86, 260, 190);
     oceanGeometry.rotateX(-Math.PI / 2);
     const ocean = new THREE.Mesh(oceanGeometry, oceanMaterial);
     ocean.position.set(16, 0, 0);
@@ -644,6 +655,9 @@
     const ship = createShip();
     scene.add(land, baseStation, ship);
 
+    const SEA_LEVEL_Y = 0.35;
+    const DUCT_SCENE_UNITS_PER_METER = 0.82;
+
     const ductGroup = new THREE.Group();
     ductGroup.name = "evaporation-duct-layer";
     scene.add(ductGroup);
@@ -762,20 +776,22 @@
       ui.edhMetric.textContent = `${ductHeight} m`;
       ui.linkMetric.textContent = ductHeight >= 14 ? "稳定" : "边缘";
       oceanMaterial.uniforms.amp.value = sea;
-      const sceneDuctScale = ductHeight / 18;
+      const ductTopY = SEA_LEVEL_Y + ductHeight * DUCT_SCENE_UNITS_PER_METER;
       material.ductSurface.uniforms.opacity.value = opacity / 100;
       ductMistMaterials.forEach((mistMaterial) => {
         mistMaterial.uniforms.opacity.value = opacity / 135;
       });
-      ductTop.position.y = 1.0 + 1.65 * sceneDuctScale;
-      ductLower.position.y = 0.75 + 0.4 * sceneDuctScale;
+      ductTop.position.y = ductTopY;
+      ductLower.position.y = SEA_LEVEL_Y + Math.min(2.4, ductHeight * 0.08);
       ductBoundary.position.y = ductTop.position.y - 2.7;
-      ductSideLines.scale.y = sceneDuctScale;
+      ductSideLines.scale.y = Math.max(1, (ductTopY - SEA_LEVEL_Y) / 1.9);
+      ductSideLines.position.y = SEA_LEVEL_Y - 0.8 * ductSideLines.scale.y;
       ductMistPlanes.forEach((plane, index) => {
-        plane.position.y = 0.95 + index * 0.27 * sceneDuctScale;
+        const t = (index + 1) / (ductMistPlanes.length + 1);
+        plane.position.y = SEA_LEVEL_Y + (ductTopY - SEA_LEVEL_Y) * t;
         plane.material.uniforms.opacity.value = opacity / 165;
       });
-      labels[1].position.y = ductTop.position.y + 1.0;
+      labels[1].position.y = ductTopY + 1.2;
     }
 
     ui.sea.addEventListener("input", updateUi);
