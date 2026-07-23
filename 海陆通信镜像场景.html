@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>海陆通信镜像场景 - 玻璃体素蒸发波导</title>
+  <title>海陆通信镜像场景 - 蒸发波导层</title>
   <style>
     :root {
       --bg: #07131a;
@@ -162,7 +162,7 @@
   <section class="hud" aria-label="运行指标">
     <div class="panel">
       <h1>海陆通信镜像场景</h1>
-      <p class="subhead">左侧岸地承载 5G 岸边基站，右侧大面积海域显示船舶链路与玻璃体素蒸发波导层。</p>
+      <p class="subhead">左侧岸地承载 5G 岸边基站，右侧大面积海域显示船舶链路与近海面蒸发波导层。</p>
     </div>
     <div class="metrics panel">
       <div class="metric"><span>海域占比</span><strong>78%</strong></div>
@@ -181,13 +181,13 @@
       <input id="ductHeight" type="range" min="8" max="32" step="1" value="18">
     </label>
     <label>
-      <span class="line"><span>体素透明度</span><span id="opacityValue">42%</span></span>
-      <input id="ductOpacity" type="range" min="18" max="72" step="2" value="42">
+      <span class="line"><span>波导显著度</span><span id="opacityValue">46%</span></span>
+      <input id="ductOpacity" type="range" min="18" max="72" step="2" value="46">
     </label>
   </section>
 
-  <div id="baseLabel" class="label">岸边 5G 基站</div>
-  <div id="ductLabel" class="label">玻璃体素蒸发波导层</div>
+  <div id="baseLabel" class="label">岸边 5G 基站（约 18 m）</div>
+  <div id="ductLabel" class="label">蒸发波导影响层</div>
   <div id="shipLabel" class="label">海上接收船</div>
 
   <script type="importmap">
@@ -240,7 +240,7 @@
     };
 
     const labels = [
-      { element: document.getElementById("baseLabel"), position: new THREE.Vector3(-32, 20, -10) },
+      { element: document.getElementById("baseLabel"), position: new THREE.Vector3(-32, 15.8, -10) },
       { element: document.getElementById("ductLabel"), position: new THREE.Vector3(20, 7, -18) },
       { element: document.getElementById("shipLabel"), position: new THREE.Vector3(31, 5.8, 13) }
     ];
@@ -368,18 +368,72 @@
       steel: new THREE.MeshStandardMaterial({ color: "#c5d0d4", roughness: 0.26, metalness: 0.72 }),
       white: new THREE.MeshStandardMaterial({ color: "#f2f4f4", roughness: 0.28, metalness: 0.12 }),
       blue: new THREE.MeshStandardMaterial({ color: "#1668d8", roughness: 0.36, metalness: 0.08, emissive: "#0646a9", emissiveIntensity: 0.2 }),
-      glass: new THREE.MeshPhysicalMaterial({
-        color: colors.duct,
+      ductSurface: new THREE.ShaderMaterial({
         transparent: true,
-        opacity: 0.42,
-        roughness: 0.06,
-        metalness: 0,
-        transmission: 0.45,
-        thickness: 0.45,
-        ior: 1.36,
-        clearcoat: 1,
-        clearcoatRoughness: 0.05,
-        depthWrite: false
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        uniforms: {
+          time: { value: 0 },
+          opacity: { value: 0.46 },
+          ductColor: { value: colors.duct },
+          amber: { value: colors.amber }
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          uniform float time;
+          void main() {
+            vUv = uv;
+            vec3 pos = position;
+            pos.y += sin(pos.x * 0.18 + time * 0.58) * 0.055 + cos(pos.z * 0.13 + time * 0.42) * 0.04;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+          }
+        `,
+        fragmentShader: `
+          varying vec2 vUv;
+          uniform vec3 ductColor;
+          uniform vec3 amber;
+          uniform float opacity;
+          uniform float time;
+          void main() {
+            float lateral = smoothstep(0.04, 0.2, vUv.x) * (1.0 - smoothstep(0.78, 0.98, vUv.x));
+            float vertical = smoothstep(0.02, 0.18, vUv.y) * (1.0 - smoothstep(0.82, 0.98, vUv.y));
+            float ribbons = 0.55 + 0.45 * sin(vUv.x * 72.0 + time * 1.25);
+            float bands = 0.68 + 0.32 * sin(vUv.y * 18.0 - time * 0.7);
+            vec3 color = mix(ductColor, amber, smoothstep(0.72, 1.0, vUv.y) * 0.35);
+            gl_FragColor = vec4(color, opacity * lateral * vertical * (0.22 + ribbons * bands * 0.38));
+          }
+        `
+      }),
+      ductMist: new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        uniforms: {
+          time: { value: 0 },
+          opacity: { value: 0.34 },
+          ductColor: { value: colors.duct }
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          uniform float time;
+          void main() {
+            vUv = uv;
+            vec3 pos = position;
+            pos.z += sin(pos.x * 0.08 + time * 0.32) * 0.22;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+          }
+        `,
+        fragmentShader: `
+          varying vec2 vUv;
+          uniform vec3 ductColor;
+          uniform float opacity;
+          uniform float time;
+          void main() {
+            float softEdge = smoothstep(0.0, 0.2, vUv.y) * (1.0 - smoothstep(0.72, 1.0, vUv.y));
+            float texture = 0.48 + 0.52 * sin(vUv.x * 38.0 + time * 0.9) * sin(vUv.y * 16.0 - time * 0.5);
+            gl_FragColor = vec4(ductColor, opacity * softEdge * (0.22 + texture * 0.18));
+          }
+        `
       })
     };
 
@@ -474,6 +528,9 @@
       const group = new THREE.Group();
       group.position.set(-34, 1.05, -10);
       group.rotation.y = -0.18;
+      group.scale.setScalar(0.72);
+      group.userData.sceneHeight = 21;
+      group.userData.estimatedHeightM = 18;
 
       addMesh(group, new THREE.BoxGeometry(9.2, 0.72, 7.2), material.concrete, new THREE.Vector3(0, 0.36, 0));
       const cabinet = addMesh(group, new THREE.BoxGeometry(3.7, 5.9, 2.05), material.white, new THREE.Vector3(1.8, 3.3, 0.15));
@@ -588,32 +645,63 @@
     scene.add(land, baseStation, ship);
 
     const ductGroup = new THREE.Group();
-    ductGroup.name = "glass-voxel-evaporation-duct";
+    ductGroup.name = "evaporation-duct-layer";
     scene.add(ductGroup);
-    const voxelGeometry = new THREE.BoxGeometry(2.9, 0.56, 2.9);
-    const voxels = [];
-    for (let ix = 0; ix < 22; ix += 1) {
-      for (let iy = 0; iy < 4; iy += 1) {
-        for (let iz = 0; iz < 12; iz += 1) {
-          if ((ix + iz + iy) % 5 === 0) continue;
-          const voxel = new THREE.Mesh(voxelGeometry, material.glass.clone());
-          const jitter = Math.sin(ix * 3.1 + iz * 1.9 + iy) * 0.32;
-          voxel.position.set(-8 + ix * 3.25 + jitter, 1.15 + iy * 0.84, -30 + iz * 5.0 + Math.cos(ix + iy) * 0.28);
-          voxel.scale.set(0.88 + Math.sin(ix + iz) * 0.08, 0.62, 0.8 + Math.cos(ix * 0.7) * 0.1);
-          voxel.material.opacity = 0.14 + iy * 0.055 + (ix / 22) * 0.06;
-          voxel.renderOrder = 2;
-          ductGroup.add(voxel);
-          voxels.push(voxel);
-        }
-      }
+    const ductTop = new THREE.Mesh(new THREE.PlaneGeometry(78, 58, 56, 36), material.ductSurface);
+    ductTop.rotation.x = -Math.PI / 2;
+    ductTop.position.set(25, 2.65, -2.5);
+    ductTop.renderOrder = 2;
+    ductGroup.add(ductTop);
+
+    const ductLower = new THREE.Mesh(new THREE.PlaneGeometry(78, 58, 56, 36), material.ductMist.clone());
+    ductLower.rotation.x = -Math.PI / 2;
+    ductLower.position.set(25, 1.15, -2.5);
+    ductLower.renderOrder = 1;
+    ductGroup.add(ductLower);
+
+    const ductMistPlanes = [];
+    const ductMistMaterials = [ductLower.material];
+    for (let i = 0; i < 6; i += 1) {
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(74, 4.8, 44, 4), material.ductMist.clone());
+      plane.position.set(25, 1.35 + i * 0.42, -27 + i * 10.5);
+      plane.rotation.x = -0.08 + i * 0.018;
+      plane.renderOrder = 2;
+      ductGroup.add(plane);
+      ductMistPlanes.push(plane);
+      ductMistMaterials.push(plane.material);
     }
 
-    const ductFrame = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(73, 4.1, 58)),
-      new THREE.LineBasicMaterial({ color: "#b8f7ff", transparent: true, opacity: 0.32 })
+    const ductBoundaryMaterial = new THREE.LineDashedMaterial({
+      color: "#ffc766",
+      transparent: true,
+      opacity: 0.82,
+      dashSize: 1.25,
+      gapSize: 0.7
+    });
+    const ductBoundary = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-14, 2.7, -31.5),
+        new THREE.Vector3(64, 2.7, -31.5),
+        new THREE.Vector3(64, 2.7, 26.5),
+        new THREE.Vector3(-14, 2.7, 26.5),
+        new THREE.Vector3(-14, 2.7, -31.5)
+      ]),
+      ductBoundaryMaterial
     );
-    ductFrame.position.set(26, 2.78, -2.5);
-    ductGroup.add(ductFrame);
+    ductBoundary.computeLineDistances();
+    ductGroup.add(ductBoundary);
+
+    const ductSideMaterial = new THREE.LineBasicMaterial({ color: "#b8f7ff", transparent: true, opacity: 0.26 });
+    const ductSideLines = new THREE.LineSegments(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-14, 0.8, -31.5), new THREE.Vector3(-14, 2.7, -31.5),
+        new THREE.Vector3(64, 0.8, -31.5), new THREE.Vector3(64, 2.7, -31.5),
+        new THREE.Vector3(64, 0.8, 26.5), new THREE.Vector3(64, 2.7, 26.5),
+        new THREE.Vector3(-14, 0.8, 26.5), new THREE.Vector3(-14, 2.7, 26.5)
+      ]),
+      ductSideMaterial
+    );
+    ductGroup.add(ductSideLines);
 
     const beamMaterial = new THREE.LineBasicMaterial({ color: "#71f4ff", transparent: true, opacity: 0.86 });
     const lowerBeamMaterial = new THREE.LineBasicMaterial({ color: "#ffc766", transparent: true, opacity: 0.58 });
@@ -622,12 +710,12 @@
 
     function makeDuctRay(offsetZ, bounce) {
       const points = [];
-      const start = new THREE.Vector3(-34.5, 17.4, -10 + offsetZ);
+      const start = new THREE.Vector3(-34.5, 13.25, -10 + offsetZ);
       const end = new THREE.Vector3(31, 2.8, 13 + offsetZ * 0.45);
       for (let i = 0; i <= 88; i += 1) {
         const t = i / 88;
         const point = start.clone().lerp(end, t);
-        point.y = 2.2 + Math.abs(Math.sin(t * Math.PI * bounce)) * 2.6 + (1 - t) * 2.6;
+        point.y = 1.35 + Math.abs(Math.sin(t * Math.PI * bounce)) * 1.75 + (1 - t) * 1.25;
         points.push(point);
       }
       return new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), beamMaterial);
@@ -638,9 +726,9 @@
     beamGroup.add(makeDuctRay(3.4, 5));
     beamGroup.add(new THREE.Line(
       new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(-34.5, 17.5, -10),
-        new THREE.Vector3(-8, 6.7, -7),
-        new THREE.Vector3(9, 4.1, 1),
+        new THREE.Vector3(-34.5, 13.3, -10),
+        new THREE.Vector3(-8, 5.0, -7),
+        new THREE.Vector3(9, 3.5, 1),
         new THREE.Vector3(31, 2.8, 13)
       ]),
       lowerBeamMaterial
@@ -674,13 +762,20 @@
       ui.edhMetric.textContent = `${ductHeight} m`;
       ui.linkMetric.textContent = ductHeight >= 14 ? "稳定" : "边缘";
       oceanMaterial.uniforms.amp.value = sea;
-      material.glass.opacity = opacity / 100;
-      ductGroup.scale.y = ductHeight / 18;
-      ductFrame.scale.y = ductHeight / 18;
-      for (const voxel of voxels) {
-        voxel.material.opacity = Math.min(0.74, (opacity / 100) * (0.48 + voxel.position.y * 0.08));
-      }
-      labels[1].position.y = 3.6 + ductHeight / 3.8;
+      const sceneDuctScale = ductHeight / 18;
+      material.ductSurface.uniforms.opacity.value = opacity / 100;
+      ductMistMaterials.forEach((mistMaterial) => {
+        mistMaterial.uniforms.opacity.value = opacity / 135;
+      });
+      ductTop.position.y = 1.0 + 1.65 * sceneDuctScale;
+      ductLower.position.y = 0.75 + 0.4 * sceneDuctScale;
+      ductBoundary.position.y = ductTop.position.y - 2.7;
+      ductSideLines.scale.y = sceneDuctScale;
+      ductMistPlanes.forEach((plane, index) => {
+        plane.position.y = 0.95 + index * 0.27 * sceneDuctScale;
+        plane.material.uniforms.opacity.value = opacity / 165;
+      });
+      labels[1].position.y = ductTop.position.y + 1.0;
     }
 
     ui.sea.addEventListener("input", updateUi);
@@ -702,10 +797,11 @@
     function animate() {
       const elapsed = clock.getElapsedTime();
       oceanMaterial.uniforms.time.value = elapsed;
-      for (let i = 0; i < voxels.length; i += 1) {
-        const voxel = voxels[i];
-        voxel.position.y += Math.sin(elapsed * 0.65 + i * 0.37) * 0.0015;
-        voxel.rotation.y = Math.sin(elapsed * 0.14 + i) * 0.035;
+      material.ductSurface.uniforms.time.value = elapsed;
+      ductLower.material.uniforms.time.value = elapsed;
+      for (let i = 0; i < ductMistPlanes.length; i += 1) {
+        ductMistPlanes[i].material.uniforms.time.value = elapsed + i * 0.45;
+        ductMistPlanes[i].position.x = 25 + Math.sin(elapsed * 0.18 + i) * 0.2;
       }
 
       const curve = beamGroup.children[1].geometry.attributes.position;
