@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>海陆通信镜像场景 - 玻璃体素蒸发波导</title>
+  <style>
+    :root {
+      --bg: #07131a;
+      --panel: rgba(8, 24, 34, 0.74);
+      --line: rgba(168, 221, 238, 0.22);
+      --text: #ecfbff;
+      --muted: #a9c4cf;
+      --cyan: #69e8ff;
+      --green: #6fd089;
+      --warn: #f7bd62;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    }
+
+    #scene {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .hud {
+      position: fixed;
+      left: 18px;
+      top: 18px;
+      z-index: 2;
+      display: grid;
+      gap: 10px;
+      width: min(360px, calc(100vw - 36px));
+      pointer-events: none;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      padding: 14px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .subhead {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .metric {
+      min-width: 0;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 9px;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 5px;
+      color: var(--text);
+      font-size: 17px;
+      line-height: 1;
+    }
+
+    .controls {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 2;
+      width: min(330px, calc(100vw - 36px));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      padding: 14px;
+    }
+
+    label {
+      display: grid;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    label + label { margin-top: 12px; }
+
+    .line {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--cyan);
+    }
+
+    .label {
+      position: fixed;
+      z-index: 3;
+      transform: translate(-50%, -50%);
+      border: 1px solid rgba(147, 226, 255, 0.34);
+      border-radius: 999px;
+      background: rgba(3, 15, 24, 0.72);
+      color: #f4fdff;
+      font-size: 12px;
+      line-height: 1;
+      padding: 7px 10px;
+      pointer-events: none;
+      white-space: nowrap;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+    }
+
+    @media (max-width: 720px) {
+      .hud { top: 12px; left: 12px; width: calc(100vw - 24px); }
+      .controls { right: 12px; bottom: 12px; width: calc(100vw - 24px); }
+      .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      h1 { font-size: 17px; }
+      .subhead { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene" aria-label="左岸右海海陆通信三维场景"></canvas>
+
+  <section class="hud" aria-label="运行指标">
+    <div class="panel">
+      <h1>海陆通信镜像场景</h1>
+      <p class="subhead">左侧岸地承载 5G 岸边基站，右侧大面积海域显示船舶链路与玻璃体素蒸发波导层。</p>
+    </div>
+    <div class="metrics panel">
+      <div class="metric"><span>海域占比</span><strong>78%</strong></div>
+      <div class="metric"><span>EDH</span><strong id="edhMetric">18 m</strong></div>
+      <div class="metric"><span>链路状态</span><strong id="linkMetric">稳定</strong></div>
+    </div>
+  </section>
+
+  <section class="controls" aria-label="场景参数">
+    <label>
+      <span class="line"><span>海况强度</span><span id="seaValue">1.2 m</span></span>
+      <input id="seaState" type="range" min="0.4" max="2.8" step="0.1" value="1.2">
+    </label>
+    <label>
+      <span class="line"><span>波导层高度</span><span id="ductValue">18 m</span></span>
+      <input id="ductHeight" type="range" min="8" max="32" step="1" value="18">
+    </label>
+    <label>
+      <span class="line"><span>体素透明度</span><span id="opacityValue">42%</span></span>
+      <input id="ductOpacity" type="range" min="18" max="72" step="2" value="42">
+    </label>
+  </section>
+
+  <div id="baseLabel" class="label">岸边 5G 基站</div>
+  <div id="ductLabel" class="label">玻璃体素蒸发波导层</div>
+  <div id="shipLabel" class="label">海上接收船</div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+    const canvas = document.getElementById("scene");
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color("#87c6df");
+    scene.fog = new THREE.Fog(0xa9d8e8, 58, 150);
+
+    const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 260);
+    camera.position.set(38, 31, 60);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(4, 4, 0);
+    controls.minDistance = 18;
+    controls.maxDistance = 96;
+    controls.maxPolarAngle = Math.PI * 0.48;
+
+    const clock = new THREE.Clock();
+    const ui = {
+      sea: document.getElementById("seaState"),
+      ductHeight: document.getElementById("ductHeight"),
+      ductOpacity: document.getElementById("ductOpacity"),
+      seaValue: document.getElementById("seaValue"),
+      ductValue: document.getElementById("ductValue"),
+      opacityValue: document.getElementById("opacityValue"),
+      edhMetric: document.getElementById("edhMetric"),
+      linkMetric: document.getElementById("linkMetric")
+    };
+
+    const labels = [
+      { element: document.getElementById("baseLabel"), position: new THREE.Vector3(-32, 20, -10) },
+      { element: document.getElementById("ductLabel"), position: new THREE.Vector3(20, 7, -18) },
+      { element: document.getElementById("shipLabel"), position: new THREE.Vector3(31, 5.8, 13) }
+    ];
+
+    scene.add(new THREE.HemisphereLight(0xdff8ff, 0x234b3e, 2.3));
+    const sun = new THREE.DirectionalLight(0xffffff, 3.4);
+    sun.position.set(-34, 58, 28);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -72;
+    sun.shadow.camera.right = 72;
+    sun.shadow.camera.top = 72;
+    sun.shadow.camera.bottom = -72;
+    scene.add(sun);
+
+    const fill = new THREE.DirectionalLight(0x92e6ff, 1.15);
+    fill.position.set(45, 24, -36);
+    scene.add(fill);
+
+    const sky = new THREE.Mesh(
+      new THREE.SphereGeometry(130, 48, 24),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: {
+          top: { value: new THREE.Color("#2f8ec2") },
+          horizon: { value: new THREE.Color("#e8f7ff") }
+        },
+        vertexShader: `
+          varying vec3 vWorld;
+          void main() {
+            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+            vWorld = normalize(worldPosition.xyz);
+            gl_Position = projectionMatrix * viewMatrix * worldPosition;
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vWorld;
+          uniform vec3 top;
+          uniform vec3 horizon;
+          void main() {
+            float h = smoothstep(-0.08, 0.9, vWorld.y);
+            gl_FragColor = vec4(mix(horizon, top, h), 1.0);
+          }
+        `
+      })
+    );
+    scene.add(sky);
+
+    const colors = {
+      oceanDeep: new THREE.Color("#06466e"),
+      ocean: new THREE.Color("#1688a6"),
+      foam: new THREE.Color("#e3fbff"),
+      grass: new THREE.Color("#4f8b43"),
+      rock: new THREE.Color("#7a6452"),
+      sand: new THREE.Color("#d8c08a"),
+      duct: new THREE.Color("#95f1ff"),
+      amber: new THREE.Color("#ffc766")
+    };
+
+    const oceanMaterial = new THREE.ShaderMaterial({
+      transparent: true,
+      uniforms: {
+        time: { value: 0 },
+        amp: { value: 1.2 },
+        deep: { value: colors.oceanDeep },
+        sea: { value: colors.ocean },
+        foam: { value: colors.foam }
+      },
+      vertexShader: `
+        varying float vWave;
+        varying vec2 vUv;
+        uniform float time;
+        uniform float amp;
+        void main() {
+          vUv = uv;
+          vec3 pos = position;
+          float w1 = sin(pos.x * 0.18 + time * 0.9) * cos(pos.z * 0.12 + time * 0.54) * amp;
+          float w2 = sin((pos.x + pos.z) * 0.45 + time * 1.7) * amp * 0.22;
+          float w3 = cos(pos.z * 0.62 - time * 1.2) * amp * 0.12;
+          pos.y += w1 + w2 + w3;
+          vWave = pos.y;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying float vWave;
+        varying vec2 vUv;
+        uniform vec3 deep;
+        uniform vec3 sea;
+        uniform vec3 foam;
+        void main() {
+          float heightMix = smoothstep(-1.4, 1.8, vWave);
+          float fine = sin(vUv.x * 360.0) * sin(vUv.y * 260.0) * 0.04;
+          float crest = smoothstep(0.8, 1.55, vWave);
+          vec3 color = mix(deep, sea, heightMix + fine);
+          color = mix(color, foam, crest * 0.46);
+          gl_FragColor = vec4(color, 0.84);
+        }
+      `
+    });
+
+    const oceanGeometry = new THREE.PlaneGeometry(118, 86, 190, 138);
+    oceanGeometry.rotateX(-Math.PI / 2);
+    const ocean = new THREE.Mesh(oceanGeometry, oceanMaterial);
+    ocean.position.set(16, 0, 0);
+    ocean.receiveShadow = true;
+    scene.add(ocean);
+
+    const seabed = new THREE.Mesh(
+      new THREE.PlaneGeometry(118, 86),
+      new THREE.MeshStandardMaterial({ color: "#856f57", roughness: 0.95 })
+    );
+    seabed.rotation.x = -Math.PI / 2;
+    seabed.position.set(16, -5.2, 0);
+    seabed.receiveShadow = true;
+    scene.add(seabed);
+
+    const material = {
+      grass: new THREE.MeshStandardMaterial({ color: colors.grass, roughness: 0.82 }),
+      rock: new THREE.MeshStandardMaterial({ color: colors.rock, roughness: 0.88 }),
+      sand: new THREE.MeshStandardMaterial({ color: colors.sand, roughness: 0.74 }),
+      concrete: new THREE.MeshStandardMaterial({ color: "#c9d0d2", roughness: 0.54, metalness: 0.08 }),
+      dark: new THREE.MeshStandardMaterial({ color: "#263036", roughness: 0.62, metalness: 0.24 }),
+      steel: new THREE.MeshStandardMaterial({ color: "#c5d0d4", roughness: 0.26, metalness: 0.72 }),
+      white: new THREE.MeshStandardMaterial({ color: "#f2f4f4", roughness: 0.28, metalness: 0.12 }),
+      blue: new THREE.MeshStandardMaterial({ color: "#1668d8", roughness: 0.36, metalness: 0.08, emissive: "#0646a9", emissiveIntensity: 0.2 }),
+      glass: new THREE.MeshPhysicalMaterial({
+        color: colors.duct,
+        transparent: true,
+        opacity: 0.42,
+        roughness: 0.06,
+        metalness: 0,
+        transmission: 0.45,
+        thickness: 0.45,
+        ior: 1.36,
+        clearcoat: 1,
+        clearcoatRoughness: 0.05,
+        depthWrite: false
+      })
+    };
+
+    function addMesh(parent, geometry, mat, position, rotation, scale) {
+      const mesh = new THREE.Mesh(geometry, mat);
+      if (position) mesh.position.copy(position);
+      if (rotation) mesh.rotation.set(rotation.x || 0, rotation.y || 0, rotation.z || 0);
+      if (scale) mesh.scale.copy(scale);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function cylinderBetween(parent, start, end, radius, mat) {
+      const delta = new THREE.Vector3().subVectors(end, start);
+      const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, delta.length(), 10), mat);
+      mesh.position.copy(mid);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function createLand() {
+      const group = new THREE.Group();
+      const topShape = new THREE.Shape();
+      topShape.moveTo(-58, -42);
+      topShape.lineTo(-31, -42);
+      topShape.bezierCurveTo(-23, -32, -29, -21, -22, -11);
+      topShape.bezierCurveTo(-15, -1, -24, 9, -16, 20);
+      topShape.bezierCurveTo(-23, 29, -23, 36, -17, 42);
+      topShape.lineTo(-58, 42);
+      topShape.closePath();
+
+      const top = new THREE.Mesh(new THREE.ShapeGeometry(topShape), material.grass);
+      top.rotation.x = -Math.PI / 2;
+      top.position.y = 1.04;
+      top.receiveShadow = true;
+      group.add(top);
+
+      const cliffShape = new THREE.Shape();
+      cliffShape.moveTo(-31, -42);
+      cliffShape.bezierCurveTo(-23, -32, -29, -21, -22, -11);
+      cliffShape.bezierCurveTo(-15, -1, -24, 9, -16, 20);
+      cliffShape.bezierCurveTo(-23, 29, -23, 36, -17, 42);
+      cliffShape.lineTo(-8, 42);
+      cliffShape.bezierCurveTo(-15, 34, -12, 25, -8, 17);
+      cliffShape.bezierCurveTo(-16, 6, -7, -2, -13, -13);
+      cliffShape.bezierCurveTo(-20, -24, -14, -35, -22, -42);
+      cliffShape.closePath();
+
+      const beach = new THREE.Mesh(new THREE.ShapeGeometry(cliffShape), material.sand);
+      beach.rotation.x = -Math.PI / 2;
+      beach.position.y = 0.42;
+      beach.receiveShadow = true;
+      group.add(beach);
+
+      const cliff = new THREE.Group();
+      for (let i = 0; i < 18; i += 1) {
+        const z = -39 + i * 4.6;
+        const x = -17 + Math.sin(i * 1.3) * 3.2;
+        const rock = addMesh(
+          cliff,
+          new THREE.BoxGeometry(2.8 + Math.sin(i) * 0.7, 2.2 + Math.cos(i * 1.7) * 0.55, 3.4),
+          material.rock,
+          new THREE.Vector3(x, -0.75, z),
+          { x: 0.08 * Math.sin(i), y: 0.42 * Math.cos(i), z: 0.04 * Math.cos(i * 2) }
+        );
+        rock.scale.y = 0.8 + (i % 3) * 0.16;
+      }
+      group.add(cliff);
+
+      const foamMat = new THREE.LineBasicMaterial({ color: 0xf4fdff, transparent: true, opacity: 0.86 });
+      for (let k = 0; k < 5; k += 1) {
+        const points = [];
+        for (let i = 0; i <= 80; i += 1) {
+          const t = i / 80;
+          const z = -41 + t * 82;
+          const x = -10.5 + Math.sin(t * 24 + k) * 1.1 + k * 1.25;
+          points.push(new THREE.Vector3(x, 0.22 + k * 0.02, z));
+        }
+        group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), foamMat));
+      }
+
+      return group;
+    }
+
+    function createImg2ThreeStyleBaseStation() {
+      const group = new THREE.Group();
+      group.position.set(-34, 1.05, -10);
+      group.rotation.y = -0.18;
+
+      addMesh(group, new THREE.BoxGeometry(9.2, 0.72, 7.2), material.concrete, new THREE.Vector3(0, 0.36, 0));
+      const cabinet = addMesh(group, new THREE.BoxGeometry(3.7, 5.9, 2.05), material.white, new THREE.Vector3(1.8, 3.3, 0.15));
+      cabinet.name = "open-equipment-cabinet";
+      addMesh(group, new THREE.BoxGeometry(1.68, 5.65, 0.09), material.white, new THREE.Vector3(-0.25, 3.34, 1.38), { y: -0.7 });
+      addMesh(group, new THREE.BoxGeometry(1.68, 5.65, 0.09), material.white, new THREE.Vector3(3.85, 3.34, 1.38), { y: 0.7 });
+      addMesh(group, new THREE.BoxGeometry(2.64, 4.55, 0.16), material.dark, new THREE.Vector3(1.8, 3.16, 1.24));
+
+      for (let i = 0; i < 6; i += 1) {
+        const y = 1.28 + i * 0.62;
+        addMesh(group, new THREE.BoxGeometry(2.25, 0.32, 0.2), material.steel, new THREE.Vector3(1.8, y, 1.36));
+        for (let j = 0; j < 4; j += 1) {
+          addMesh(group, new THREE.BoxGeometry(0.22, 0.09, 0.03), material.blue, new THREE.Vector3(1.08 + j * 0.46, y, 1.48));
+        }
+      }
+
+      const cableColors = ["#168dff", "#f2a33a", "#ffe250", "#35bd60", "#7e64ff"];
+      for (let i = 0; i < cableColors.length; i += 1) {
+        const cableMat = new THREE.MeshStandardMaterial({ color: cableColors[i], roughness: 0.36, metalness: 0.08 });
+        const x = 0.72 + i * 0.42;
+        cylinderBetween(group, new THREE.Vector3(x, 1.0, 1.58), new THREE.Vector3(x, 6.1, 1.58), 0.045, cableMat);
+        cylinderBetween(group, new THREE.Vector3(x, 1.0, 1.58), new THREE.Vector3(x - 3.8 + i * 0.5, 0.08, 2.95), 0.052, cableMat);
+      }
+
+      const tower = new THREE.Group();
+      tower.position.set(-1.7, 0.72, -0.25);
+      group.add(tower);
+      const levels = [0, 3.2, 6.4, 9.6, 12.8, 16];
+      const legBase = [
+        new THREE.Vector3(-1.6, 0, -1.45),
+        new THREE.Vector3(1.6, 0, -1.45),
+        new THREE.Vector3(-1.6, 0, 1.45),
+        new THREE.Vector3(1.6, 0, 1.45)
+      ];
+      const legTop = [
+        new THREE.Vector3(-0.58, 16, -0.52),
+        new THREE.Vector3(0.58, 16, -0.52),
+        new THREE.Vector3(-0.58, 16, 0.52),
+        new THREE.Vector3(0.58, 16, 0.52)
+      ];
+      for (let i = 0; i < 4; i += 1) cylinderBetween(tower, legBase[i], legTop[i], 0.07, material.steel);
+      for (let i = 0; i < levels.length; i += 1) {
+        const t = levels[i] / 16;
+        const r = THREE.MathUtils.lerp(1.6, 0.58, t);
+        cylinderBetween(tower, new THREE.Vector3(-r, levels[i], -r * 0.9), new THREE.Vector3(r, levels[i], -r * 0.9), 0.045, material.steel);
+        cylinderBetween(tower, new THREE.Vector3(-r, levels[i], r * 0.9), new THREE.Vector3(r, levels[i], r * 0.9), 0.045, material.steel);
+        cylinderBetween(tower, new THREE.Vector3(-r, levels[i], -r * 0.9), new THREE.Vector3(-r, levels[i], r * 0.9), 0.045, material.steel);
+        cylinderBetween(tower, new THREE.Vector3(r, levels[i], -r * 0.9), new THREE.Vector3(r, levels[i], r * 0.9), 0.045, material.steel);
+      }
+      for (let i = 0; i < levels.length - 1; i += 1) {
+        const y0 = levels[i];
+        const y1 = levels[i + 1];
+        const r0 = THREE.MathUtils.lerp(1.6, 0.58, y0 / 16);
+        const r1 = THREE.MathUtils.lerp(1.6, 0.58, y1 / 16);
+        cylinderBetween(tower, new THREE.Vector3(-r0, y0, -r0 * 0.9), new THREE.Vector3(r1, y1, -r1 * 0.9), 0.035, material.steel);
+        cylinderBetween(tower, new THREE.Vector3(r0, y0, r0 * 0.9), new THREE.Vector3(-r1, y1, r1 * 0.9), 0.035, material.steel);
+        cylinderBetween(tower, new THREE.Vector3(-r0, y0, r0 * 0.9), new THREE.Vector3(r1, y1, r1 * 0.9), 0.035, material.steel);
+        cylinderBetween(tower, new THREE.Vector3(r0, y0, -r0 * 0.9), new THREE.Vector3(-r1, y1, -r1 * 0.9), 0.035, material.steel);
+      }
+
+      const mast = addMesh(tower, new THREE.CylinderGeometry(0.09, 0.09, 3.7, 16), material.steel, new THREE.Vector3(0, 17.8, 0));
+      mast.name = "central-mast";
+      addMesh(tower, new THREE.SphereGeometry(0.42, 24, 16), material.white, new THREE.Vector3(0, 20.05, 0));
+
+      function addPanel(angle, y, radius, label) {
+        const panelGroup = new THREE.Group();
+        const x = Math.cos(angle) * radius;
+        const z = Math.sin(angle) * radius;
+        panelGroup.position.set(x, y, z);
+        panelGroup.rotation.y = -angle + Math.PI / 2;
+        addMesh(panelGroup, new THREE.BoxGeometry(0.58, 3.2, 0.2), material.white, new THREE.Vector3(0, 0, 0));
+        addMesh(panelGroup, new THREE.BoxGeometry(0.36, 0.36, 0.04), material.blue, new THREE.Vector3(0, 0.74, 0.13));
+        if (label) panelGroup.name = label;
+        tower.add(panelGroup);
+      }
+
+      for (let i = 0; i < 6; i += 1) addPanel(i * Math.PI / 3, 14.6 + (i % 2) * 0.8, 2.25, i === 0 ? "5g-panel-array" : "");
+      for (let i = 0; i < 5; i += 1) {
+        const angle = i * Math.PI * 0.4 + 0.2;
+        const x = Math.cos(angle) * 1.25;
+        const z = Math.sin(angle) * 1.25;
+        cylinderBetween(tower, new THREE.Vector3(x * 0.55, 12.4, z * 0.55), new THREE.Vector3(x, 15.2, z), 0.035, material.dark);
+      }
+
+      const smallDish = new THREE.Mesh(new THREE.SphereGeometry(0.88, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), material.white);
+      smallDish.position.set(-5.25, 4.6, -0.4);
+      smallDish.rotation.set(-0.4, 0.8, 0);
+      smallDish.scale.z = 0.28;
+      group.add(smallDish);
+      cylinderBetween(group, new THREE.Vector3(-5.25, 0.72, -0.4), new THREE.Vector3(-5.25, 4.15, -0.4), 0.05, material.steel);
+      addMesh(group, new THREE.BoxGeometry(2.1, 2.4, 1.9), material.white, new THREE.Vector3(-5.1, 1.95, 2.25));
+
+      return group;
+    }
+
+    function createShip() {
+      const group = new THREE.Group();
+      group.position.set(31, 0.8, 13);
+      group.rotation.y = -0.56;
+      addMesh(group, new THREE.BoxGeometry(5.2, 0.72, 1.34), new THREE.MeshStandardMaterial({ color: "#f0f6f7", roughness: 0.38, metalness: 0.12 }), new THREE.Vector3(0, 0.52, 0));
+      addMesh(group, new THREE.ConeGeometry(0.8, 1.8, 4), new THREE.MeshStandardMaterial({ color: "#4aa9c8", roughness: 0.48 }), new THREE.Vector3(3.05, 0.52, 0), { z: -Math.PI / 2, y: Math.PI / 4 });
+      addMesh(group, new THREE.BoxGeometry(1.55, 0.88, 0.92), material.white, new THREE.Vector3(-0.8, 1.27, 0));
+      addMesh(group, new THREE.BoxGeometry(1.1, 0.32, 0.06), material.blue, new THREE.Vector3(-0.8, 1.42, 0.49));
+      cylinderBetween(group, new THREE.Vector3(0.15, 1.6, 0.0), new THREE.Vector3(0.15, 3.5, 0.0), 0.035, material.steel);
+      addMesh(group, new THREE.SphereGeometry(0.14, 16, 10), material.blue, new THREE.Vector3(0.15, 3.64, 0));
+      return group;
+    }
+
+    const land = createLand();
+    const baseStation = createImg2ThreeStyleBaseStation();
+    const ship = createShip();
+    scene.add(land, baseStation, ship);
+
+    const ductGroup = new THREE.Group();
+    ductGroup.name = "glass-voxel-evaporation-duct";
+    scene.add(ductGroup);
+    const voxelGeometry = new THREE.BoxGeometry(2.9, 0.56, 2.9);
+    const voxels = [];
+    for (let ix = 0; ix < 22; ix += 1) {
+      for (let iy = 0; iy < 4; iy += 1) {
+        for (let iz = 0; iz < 12; iz += 1) {
+          if ((ix + iz + iy) % 5 === 0) continue;
+          const voxel = new THREE.Mesh(voxelGeometry, material.glass.clone());
+          const jitter = Math.sin(ix * 3.1 + iz * 1.9 + iy) * 0.32;
+          voxel.position.set(-8 + ix * 3.25 + jitter, 1.15 + iy * 0.84, -30 + iz * 5.0 + Math.cos(ix + iy) * 0.28);
+          voxel.scale.set(0.88 + Math.sin(ix + iz) * 0.08, 0.62, 0.8 + Math.cos(ix * 0.7) * 0.1);
+          voxel.material.opacity = 0.14 + iy * 0.055 + (ix / 22) * 0.06;
+          voxel.renderOrder = 2;
+          ductGroup.add(voxel);
+          voxels.push(voxel);
+        }
+      }
+    }
+
+    const ductFrame = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(73, 4.1, 58)),
+      new THREE.LineBasicMaterial({ color: "#b8f7ff", transparent: true, opacity: 0.32 })
+    );
+    ductFrame.position.set(26, 2.78, -2.5);
+    ductGroup.add(ductFrame);
+
+    const beamMaterial = new THREE.LineBasicMaterial({ color: "#71f4ff", transparent: true, opacity: 0.86 });
+    const lowerBeamMaterial = new THREE.LineBasicMaterial({ color: "#ffc766", transparent: true, opacity: 0.58 });
+    const beamGroup = new THREE.Group();
+    scene.add(beamGroup);
+
+    function makeDuctRay(offsetZ, bounce) {
+      const points = [];
+      const start = new THREE.Vector3(-34.5, 17.4, -10 + offsetZ);
+      const end = new THREE.Vector3(31, 2.8, 13 + offsetZ * 0.45);
+      for (let i = 0; i <= 88; i += 1) {
+        const t = i / 88;
+        const point = start.clone().lerp(end, t);
+        point.y = 2.2 + Math.abs(Math.sin(t * Math.PI * bounce)) * 2.6 + (1 - t) * 2.6;
+        points.push(point);
+      }
+      return new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), beamMaterial);
+    }
+
+    beamGroup.add(makeDuctRay(-3.4, 5));
+    beamGroup.add(makeDuctRay(0, 6));
+    beamGroup.add(makeDuctRay(3.4, 5));
+    beamGroup.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-34.5, 17.5, -10),
+        new THREE.Vector3(-8, 6.7, -7),
+        new THREE.Vector3(9, 4.1, 1),
+        new THREE.Vector3(31, 2.8, 13)
+      ]),
+      lowerBeamMaterial
+    ));
+
+    const pulse = new THREE.Mesh(
+      new THREE.SphereGeometry(0.26, 20, 12),
+      new THREE.MeshBasicMaterial({ color: "#b8f7ff", transparent: true, opacity: 0.95 })
+    );
+    beamGroup.add(pulse);
+
+    function projectLabels() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      for (const label of labels) {
+        const pos = label.position.clone().project(camera);
+        const visible = pos.z > -1 && pos.z < 1;
+        label.element.style.display = visible ? "block" : "none";
+        label.element.style.left = `${(pos.x * 0.5 + 0.5) * w}px`;
+        label.element.style.top = `${(-pos.y * 0.5 + 0.5) * h}px`;
+      }
+    }
+
+    function updateUi() {
+      const sea = Number(ui.sea.value);
+      const ductHeight = Number(ui.ductHeight.value);
+      const opacity = Number(ui.ductOpacity.value);
+      ui.seaValue.textContent = `${sea.toFixed(1)} m`;
+      ui.ductValue.textContent = `${ductHeight} m`;
+      ui.opacityValue.textContent = `${opacity}%`;
+      ui.edhMetric.textContent = `${ductHeight} m`;
+      ui.linkMetric.textContent = ductHeight >= 14 ? "稳定" : "边缘";
+      oceanMaterial.uniforms.amp.value = sea;
+      material.glass.opacity = opacity / 100;
+      ductGroup.scale.y = ductHeight / 18;
+      ductFrame.scale.y = ductHeight / 18;
+      for (const voxel of voxels) {
+        voxel.material.opacity = Math.min(0.74, (opacity / 100) * (0.48 + voxel.position.y * 0.08));
+      }
+      labels[1].position.y = 3.6 + ductHeight / 3.8;
+    }
+
+    ui.sea.addEventListener("input", updateUi);
+    ui.ductHeight.addEventListener("input", updateUi);
+    ui.ductOpacity.addEventListener("input", updateUi);
+    updateUi();
+
+    function resize() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      projectLabels();
+    }
+
+    window.addEventListener("resize", resize);
+
+    function animate() {
+      const elapsed = clock.getElapsedTime();
+      oceanMaterial.uniforms.time.value = elapsed;
+      for (let i = 0; i < voxels.length; i += 1) {
+        const voxel = voxels[i];
+        voxel.position.y += Math.sin(elapsed * 0.65 + i * 0.37) * 0.0015;
+        voxel.rotation.y = Math.sin(elapsed * 0.14 + i) * 0.035;
+      }
+
+      const curve = beamGroup.children[1].geometry.attributes.position;
+      const index = Math.floor((elapsed * 18) % curve.count);
+      pulse.position.set(curve.getX(index), curve.getY(index), curve.getZ(index));
+      pulse.material.opacity = 0.62 + Math.sin(elapsed * 6) * 0.28;
+
+      ship.position.y = 0.82 + Math.sin(elapsed * 1.4) * 0.22;
+      ship.rotation.z = Math.sin(elapsed * 1.2) * 0.025;
+      controls.update();
+      renderer.render(scene, camera);
+      projectLabels();
+      requestAnimationFrame(animate);
+    }
+
+    resize();
+    animate();
+  </script>
+</body>
+</html>
