@@ -362,13 +362,20 @@
     scene.add(ocean);
 
     const seabed = new THREE.Mesh(
-      new THREE.PlaneGeometry(118, 86),
-      new THREE.MeshStandardMaterial({ color: "#856f57", roughness: 0.95 })
+      new THREE.BoxGeometry(118, 5.4, 86, 1, 4, 1),
+      new THREE.MeshStandardMaterial({ color: "#184e5d", roughness: 0.96 })
     );
-    seabed.rotation.x = -Math.PI / 2;
-    seabed.position.set(16, -5.2, 0);
+    seabed.position.set(16, -3.85, 0);
     seabed.receiveShadow = true;
     scene.add(seabed);
+
+    const terrainFoundation = new THREE.Mesh(
+      new THREE.BoxGeometry(124, 1.4, 90),
+      new THREE.MeshStandardMaterial({ color: "#6b5b49", roughness: 0.92 })
+    );
+    terrainFoundation.position.set(12, -5.95, 0);
+    terrainFoundation.receiveShadow = true;
+    scene.add(terrainFoundation);
 
     const material = {
       grass: new THREE.MeshStandardMaterial({ color: colors.grass, roughness: 0.82 }),
@@ -482,9 +489,10 @@
       topShape.lineTo(-58, 42);
       topShape.closePath();
 
-      const top = new THREE.Mesh(new THREE.ShapeGeometry(topShape), material.grass);
+      const landMassGeometry = new THREE.ExtrudeGeometry(topShape, { depth: 2.55, bevelEnabled: false });
+      const top = new THREE.Mesh(landMassGeometry, material.grass);
       top.rotation.x = -Math.PI / 2;
-      top.position.y = 1.04;
+      top.position.y = -1.51;
       top.receiveShadow = true;
       group.add(top);
 
@@ -499,9 +507,10 @@
       cliffShape.bezierCurveTo(-20, -24, -14, -35, -22, -42);
       cliffShape.closePath();
 
-      const beach = new THREE.Mesh(new THREE.ShapeGeometry(cliffShape), material.sand);
+      const beachGeometry = new THREE.ExtrudeGeometry(cliffShape, { depth: 0.92, bevelEnabled: false });
+      const beach = new THREE.Mesh(beachGeometry, material.sand);
       beach.rotation.x = -Math.PI / 2;
-      beach.position.y = 0.42;
+      beach.position.y = -0.5;
       beach.receiveShadow = true;
       group.add(beach);
 
@@ -657,6 +666,8 @@
 
     const SEA_LEVEL_Y = 0.35;
     const DUCT_SCENE_UNITS_PER_METER = 0.82;
+    const TOWER_TX_POSITION = new THREE.Vector3(-34.5, 15.25, -10);
+    const SHIP_RX_POSITION = new THREE.Vector3(31, 2.8, 13);
 
     const ductGroup = new THREE.Group();
     ductGroup.name = "evaporation-duct-layer";
@@ -718,14 +729,20 @@
     ductGroup.add(ductSideLines);
 
     const beamMaterial = new THREE.LineBasicMaterial({ color: "#71f4ff", transparent: true, opacity: 0.86 });
-    const lowerBeamMaterial = new THREE.LineBasicMaterial({ color: "#ffc766", transparent: true, opacity: 0.58 });
+    const directBeamMaterial = new THREE.LineDashedMaterial({
+      color: "#ffc766",
+      transparent: true,
+      opacity: 0.7,
+      dashSize: 1.1,
+      gapSize: 0.55
+    });
     const beamGroup = new THREE.Group();
     scene.add(beamGroup);
 
     function makeDuctRay(offsetZ, bounce) {
       const points = [];
-      const start = new THREE.Vector3(-34.5, 13.25, -10 + offsetZ);
-      const end = new THREE.Vector3(31, 2.8, 13 + offsetZ * 0.45);
+      const start = TOWER_TX_POSITION.clone().add(new THREE.Vector3(0, 0, offsetZ));
+      const end = SHIP_RX_POSITION.clone().add(new THREE.Vector3(0, 0, offsetZ * 0.45));
       for (let i = 0; i <= 88; i += 1) {
         const t = i / 88;
         const point = start.clone().lerp(end, t);
@@ -738,15 +755,17 @@
     beamGroup.add(makeDuctRay(-3.4, 5));
     beamGroup.add(makeDuctRay(0, 6));
     beamGroup.add(makeDuctRay(3.4, 5));
-    beamGroup.add(new THREE.Line(
+    const directLink = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(-34.5, 13.3, -10),
-        new THREE.Vector3(-8, 5.0, -7),
-        new THREE.Vector3(9, 3.5, 1),
-        new THREE.Vector3(31, 2.8, 13)
+        TOWER_TX_POSITION,
+        new THREE.Vector3(-7, 10.2, -6.4),
+        new THREE.Vector3(10, 6.4, 1.2),
+        SHIP_RX_POSITION
       ]),
-      lowerBeamMaterial
-    ));
+      directBeamMaterial
+    );
+    directLink.computeLineDistances();
+    beamGroup.add(directLink);
 
     const pulse = new THREE.Mesh(
       new THREE.SphereGeometry(0.26, 20, 12),
