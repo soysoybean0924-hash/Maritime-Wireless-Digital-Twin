@@ -1910,7 +1910,8 @@
       const points = [];
       const startX = txOrigin.x;
       const startZ = txOrigin.z;
-      const startY = txOrigin.y;
+      const ductTopY = SEA_LEVEL + ductModel.ductHeight;
+      const startY = Math.min(txOrigin.y, ductTopY - 1.6);
       const maxDist = 92;
       const segments = 64;
       for (let i = 0; i <= segments; i++) {
@@ -1921,8 +1922,8 @@
         const settling = 1 - Math.exp(-t * 7);
         const ductCenter = SEA_LEVEL + ductModel.ductHeight * (0.48 + 0.04 * Math.cos(t * Math.PI * 2));
         const ductWave = Math.sin(t * Math.PI * 5.5 + angleOffset * 1.7) * ductModel.ductHeight * 0.32;
-        const guidedY = Math.max(SEA_LEVEL + 0.45, Math.min(SEA_LEVEL + ductModel.ductHeight * 0.88, ductCenter + ductWave));
-        const y = startY * (1 - settling) + guidedY * settling;
+        const guidedY = Math.max(SEA_LEVEL + 0.45, Math.min(ductTopY - 1.2, ductCenter + ductWave));
+        const y = Math.min(ductTopY - 1.1, startY * (1 - settling) + guidedY * settling);
         points.push(new THREE.Vector3(x, y, z));
       }
       const curve = new THREE.CatmullRomCurve3(points);
@@ -2858,9 +2859,11 @@
         const er = THREE.MathUtils.degToRad(elev);
         const dirX = Math.cos(azimuth);
         const dirZ = Math.sin(azimuth);
+        const ductTopY = SEA_LEVEL + ductModel.ductHeight;
+        const escapeBaseY = Math.max(txOrigin.y, ductTopY + 1.4);
         const rangeMax = 44 + elev * 0.48;
-        const nearDuctSag = Math.max(0, 22 - elev * 0.26);
-        const escapeLift = 10 + elev * 0.24;
+        const nearDuctSag = Math.max(0, 8 - elev * 0.08);
+        const escapeLift = 7 + elev * 0.18;
         for (let i = 0; i <= 72; i++) {
           const t = i / 72;
           const range = t * rangeMax;
@@ -2868,7 +2871,7 @@
           const refractiveSag = -Math.sin(t * Math.PI) * nearDuctSag;
           const upwardEscape = Math.pow(t, 2.3) * escapeLift;
           const ductSkim = Math.sin(t * Math.PI * 1.45) * Math.max(1.5, 7 - elev * 0.06);
-          const y = Math.max(SEA_LEVEL + 0.7, txOrigin.y + launchSlope + refractiveSag + upwardEscape + ductSkim);
+          const y = Math.max(ductTopY + 1.0, escapeBaseY + launchSlope + refractiveSag + upwardEscape + ductSkim);
           pts.push(new THREE.Vector3(
             txOrigin.x + range * dirX,
             y,
@@ -2911,7 +2914,9 @@
         }
 
         if (r.trapped) {
-          const curve = new THREE.CatmullRomCurve3(r.points);
+          const trappedCeiling = SEA_LEVEL + ductModel.ductHeight - 1.0;
+          const trappedPts = r.points.map(p => new THREE.Vector3(p.x, Math.min(p.y, trappedCeiling), p.z));
+          const curve = new THREE.CatmullRomCurve3(trappedPts);
           const geo = new THREE.TubeGeometry(curve, Math.max(24, r.points.length * 2), 0.065, 6, false);
           const mat = new THREE.MeshBasicMaterial({
             color: 0xffc107,
