@@ -1139,8 +1139,8 @@
       positionZ: -22,
     };
     let txAntennaLocalY = baseStationConfig.txHeight - 7.5;
-    const txAntennaLocalX = -2.9;
-    const txAntennaLocalZ = -0.18;
+    const txAntennaLocalX = 0;
+    const txAntennaLocalZ = 0;
 
     /**
      * 海洋无线传播模型 — 集成了蒸发波导效应
@@ -2051,53 +2051,145 @@
     roof.castShadow = true;
     baseStationGroup.add(roof);
 
-    // 使用参考 transmitter 模型重建岸基发送机：机柜、RF机架、馈线、电源和定向天线
+    // 使用 img2threejs 风格重建岸边 5G 基站：塔架、开放机柜、天线阵列和彩色线缆
     baseStationGroup.clear();
     baseStationGroup.position.set(-20.5, 1.35, -8);
-    baseStationGroup.rotation.y = -0.24;
+    baseStationGroup.rotation.y = -0.16;
     baseStationGroup.scale.setScalar(0.92);
 
-    assetBox(8.5, 0.35, 5.7, assetMaterials.concrete, [0, 0.18, 0], baseStationGroup);
+    const stationMaterials = {
+      pad: new THREE.MeshStandardMaterial({ color: 0xc9d0d2, roughness: 0.55, metalness: 0.08 }),
+      steel: new THREE.MeshStandardMaterial({ color: 0xb8c3c8, roughness: 0.25, metalness: 0.78 }),
+      dark: new THREE.MeshStandardMaterial({ color: 0x263036, roughness: 0.62, metalness: 0.24 }),
+      white: new THREE.MeshStandardMaterial({ color: 0xf4f5f5, roughness: 0.28, metalness: 0.12 }),
+      blue: new THREE.MeshStandardMaterial({ color: 0x1768d6, roughness: 0.34, emissive: 0x0646a9, emissiveIntensity: 0.18 }),
+      cabinetFace: new THREE.MeshStandardMaterial({ color: 0x2f363a, roughness: 0.48, metalness: 0.35 })
+    };
 
-    const txCabinet = assetCabinetShell(3.3, 5.6, 1.5);
-    txCabinet.position.set(1.15, 0.35, 0.05);
-    baseStationGroup.add(txCabinet);
+    const addStationMesh = (geometry, material, position, rotation = null, parent = baseStationGroup) => {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(position);
+      if (rotation) mesh.rotation.set(rotation.x || 0, rotation.y || 0, rotation.z || 0);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    };
 
-    const txRack = assetRack(1.15, 5.42, -0.85, 9, 2.45);
-    baseStationGroup.add(txRack);
-    const sideRfBox = assetBox(0.75, 2.2, 0.55, assetMaterials.cabinet, [-1.55, 2.5, -0.18], baseStationGroup);
-    sideRfBox.name = 'shore-transmitter-rf-box';
-    baseStationGroup.add(assetVentSlats(2.75, 2.95, 0.35, 10));
-    assetBox(2.45, 0.5, 0.18, assetMaterials.module, [1.15, 1.25, -0.88], baseStationGroup);
-    assetCableBundle(0.05, 5.15, 1.4, -1.02, baseStationGroup);
-    assetCableBundle(1.8, 4.25, 0.95, -1.04, baseStationGroup, [linkMaterials.power, linkMaterials.power, linkMaterials.ground]);
+    const addStationCylinder = (start, end, radius, material, parent = baseStationGroup) => {
+      const delta = new THREE.Vector3().subVectors(end, start);
+      const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, delta.length(), 10), material);
+      mesh.position.copy(mid);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    };
 
-    const txPole = new THREE.Group();
-    txPole.position.set(-2.9, 0.35, -0.18);
-    baseStationGroup.add(txPole);
-    assetCylinderBetween(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 17.2, 0), 0.07, assetMaterials.darkSteel, txPole);
-    for (let y = 2.0; y < 15.8; y += 1.45) {
-      assetCylinderBetween(new THREE.Vector3(-0.52, y, -0.42), new THREE.Vector3(0.52, y + 0.9, 0.42), 0.025, assetMaterials.steel, txPole, 8);
-      assetCylinderBetween(new THREE.Vector3(-0.52, y, 0.42), new THREE.Vector3(0.52, y + 0.9, -0.42), 0.025, assetMaterials.steel, txPole, 8);
+    addStationMesh(new THREE.BoxGeometry(9.8, 0.55, 7.4), stationMaterials.pad, new THREE.Vector3(0, 0.28, 0));
+    addStationMesh(new THREE.BoxGeometry(4.0, 5.5, 2.0), stationMaterials.white, new THREE.Vector3(2.0, 3.05, 0.28));
+    addStationMesh(new THREE.BoxGeometry(2.75, 4.25, 0.14), stationMaterials.cabinetFace, new THREE.Vector3(2.0, 2.85, 1.38));
+    addStationMesh(new THREE.BoxGeometry(1.55, 5.2, 0.1), stationMaterials.white, new THREE.Vector3(-0.16, 3.02, 1.42), { y: -0.72 });
+    addStationMesh(new THREE.BoxGeometry(1.55, 5.2, 0.1), stationMaterials.white, new THREE.Vector3(4.1, 3.02, 1.42), { y: 0.72 });
+
+    for (let i = 0; i < 6; i++) {
+      const y = 1.18 + i * 0.55;
+      addStationMesh(new THREE.BoxGeometry(2.32, 0.28, 0.18), stationMaterials.steel, new THREE.Vector3(2.0, y, 1.52));
+      for (let j = 0; j < 4; j++) {
+        addStationMesh(new THREE.BoxGeometry(0.22, 0.08, 0.035), stationMaterials.blue, new THREE.Vector3(1.23 + j * 0.43, y, 1.64));
+      }
     }
-    const squareAntenna = assetBox(1.05, 1.22, 0.32, assetMaterials.whitePanel, [0, 17.75, -0.05], txPole);
-    squareAntenna.name = 'shore-transmitter-panel-antenna';
-    assetBox(0.46, 0.18, 0.08, assetMaterials.blue, [0.0, 17.94, -0.24], txPole);
-    const txCap = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.2, 32), assetMaterials.steel);
-    txCap.position.set(0, 18.48, -0.05);
-    txCap.castShadow = true;
-    txPole.add(txCap);
 
-    assetCable([[-2.7, 16.3, -0.22], [-1.4, 8.2, -0.58], [1.75, 5.0, -0.88]], linkMaterials.signal, 0.045, baseStationGroup);
-    assetCable([[-2.9, 17.85, -0.18], [-6.1, 20.0, -2.2], [-8.3, 19.2, -4.2]], linkMaterials.beam, 0.03, baseStationGroup);
-    assetBox(1.55, 0.42, 0.72, assetMaterials.module, [-2.9, 7.1, 0.22], baseStationGroup);
+    const cableColors = [0x168dff, 0xf2a33a, 0xffdf4b, 0x35bd60, 0x7e64ff];
+    for (let i = 0; i < cableColors.length; i++) {
+      const cableMat = new THREE.MeshStandardMaterial({ color: cableColors[i], roughness: 0.36, metalness: 0.08 });
+      const x = 0.92 + i * 0.38;
+      addStationCylinder(new THREE.Vector3(x, 0.9, 1.68), new THREE.Vector3(x, 5.75, 1.68), 0.04, cableMat);
+      addStationCylinder(new THREE.Vector3(x, 0.9, 1.68), new THREE.Vector3(x - 3.6 + i * 0.45, 0.05, 3.15), 0.052, cableMat);
+    }
+
+    const towerGroup = new THREE.Group();
+    towerGroup.position.set(-1.65, 0.52, -0.3);
+    baseStationGroup.add(towerGroup);
+    const levels = [0, 3.0, 6.0, 9.0, 12.0, 15.0];
+    const legBase = [
+      new THREE.Vector3(-1.65, 0, -1.35),
+      new THREE.Vector3(1.65, 0, -1.35),
+      new THREE.Vector3(-1.65, 0, 1.35),
+      new THREE.Vector3(1.65, 0, 1.35)
+    ];
+    const legTop = [
+      new THREE.Vector3(-0.52, 15, -0.45),
+      new THREE.Vector3(0.52, 15, -0.45),
+      new THREE.Vector3(-0.52, 15, 0.45),
+      new THREE.Vector3(0.52, 15, 0.45)
+    ];
+    for (let i = 0; i < 4; i++) addStationCylinder(legBase[i], legTop[i], 0.065, stationMaterials.steel, towerGroup);
+    for (let i = 0; i < levels.length; i++) {
+      const t = levels[i] / 15;
+      const r = THREE.MathUtils.lerp(1.65, 0.52, t);
+      addStationCylinder(new THREE.Vector3(-r, levels[i], -r * 0.82), new THREE.Vector3(r, levels[i], -r * 0.82), 0.04, stationMaterials.steel, towerGroup);
+      addStationCylinder(new THREE.Vector3(-r, levels[i], r * 0.82), new THREE.Vector3(r, levels[i], r * 0.82), 0.04, stationMaterials.steel, towerGroup);
+      addStationCylinder(new THREE.Vector3(-r, levels[i], -r * 0.82), new THREE.Vector3(-r, levels[i], r * 0.82), 0.04, stationMaterials.steel, towerGroup);
+      addStationCylinder(new THREE.Vector3(r, levels[i], -r * 0.82), new THREE.Vector3(r, levels[i], r * 0.82), 0.04, stationMaterials.steel, towerGroup);
+    }
+    for (let i = 0; i < levels.length - 1; i++) {
+      const y0 = levels[i];
+      const y1 = levels[i + 1];
+      const r0 = THREE.MathUtils.lerp(1.65, 0.52, y0 / 15);
+      const r1 = THREE.MathUtils.lerp(1.65, 0.52, y1 / 15);
+      addStationCylinder(new THREE.Vector3(-r0, y0, -r0 * 0.82), new THREE.Vector3(r1, y1, -r1 * 0.82), 0.032, stationMaterials.steel, towerGroup);
+      addStationCylinder(new THREE.Vector3(r0, y0, r0 * 0.82), new THREE.Vector3(-r1, y1, r1 * 0.82), 0.032, stationMaterials.steel, towerGroup);
+      addStationCylinder(new THREE.Vector3(-r0, y0, r0 * 0.82), new THREE.Vector3(r1, y1, r1 * 0.82), 0.032, stationMaterials.steel, towerGroup);
+      addStationCylinder(new THREE.Vector3(r0, y0, -r0 * 0.82), new THREE.Vector3(-r1, y1, -r1 * 0.82), 0.032, stationMaterials.steel, towerGroup);
+    }
+
+    addStationMesh(new THREE.CylinderGeometry(0.09, 0.09, 3.4, 16), stationMaterials.steel, new THREE.Vector3(0, 16.6, 0), null, towerGroup);
+    addStationMesh(new THREE.SphereGeometry(0.42, 24, 16), stationMaterials.white, new THREE.Vector3(0, 18.55, 0), null, towerGroup);
+
+    const createImg2ThreePanel = (angle, y, radius, label = false) => {
+      const panelGroup = new THREE.Group();
+      panelGroup.position.set(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+      panelGroup.rotation.y = -angle + Math.PI / 2;
+      addStationMesh(new THREE.BoxGeometry(0.58, 3.05, 0.18), stationMaterials.white, new THREE.Vector3(0, 0, 0), null, panelGroup);
+      addStationMesh(new THREE.BoxGeometry(0.34, 0.34, 0.04), stationMaterials.blue, new THREE.Vector3(0, 0.72, 0.13), null, panelGroup);
+      if (label) panelGroup.name = 'img2threejs-style-5g-panel';
+      towerGroup.add(panelGroup);
+    };
+    for (let i = 0; i < 6; i++) createImg2ThreePanel(i * Math.PI / 3, 13.75 + (i % 2) * 0.78, 2.2, i === 0);
+
+    for (let i = 0; i < 5; i++) {
+      const angle = i * Math.PI * 0.4 + 0.18;
+      const x = Math.cos(angle) * 1.2;
+      const z = Math.sin(angle) * 1.2;
+      addStationCylinder(new THREE.Vector3(x * 0.54, 11.6, z * 0.54), new THREE.Vector3(x, 14.35, z), 0.032, stationMaterials.dark, towerGroup);
+    }
+
+    addStationMesh(
+      new THREE.SphereGeometry(0.14, 16, 16),
+      new THREE.MeshStandardMaterial({ color: 0xff1744, roughness: 0.2, emissive: 0xff0000, emissiveIntensity: 2 }),
+      new THREE.Vector3(0, 19.25, 0),
+      null,
+      towerGroup
+    );
 
     const rebuiltBaseLabelDiv = document.createElement('div');
-    rebuiltBaseLabelDiv.textContent = '📡 岸基发送机';
-    rebuiltBaseLabelDiv.style.cssText = 'color:#fff;font-size:14px;font-weight:bold;background:rgba(0,0,0,0.72);padding:4px 10px;border-radius:12px;white-space:nowrap;';
+    rebuiltBaseLabelDiv.textContent = '📡 岸边 5G 基站';
+    rebuiltBaseLabelDiv.style.cssText = 'color:#fff;font-size:14px;font-weight:bold;background:rgba(0,0,0,0.7);padding:4px 10px;border-radius:12px;white-space:nowrap;';
     const rebuiltBaseLabel = new CSS2DObject(rebuiltBaseLabelDiv);
     rebuiltBaseLabel.position.set(0, 20.4, 0);
     baseStationGroup.add(rebuiltBaseLabel);
+
+    const smallDish = new THREE.Mesh(new THREE.SphereGeometry(0.82, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), stationMaterials.white);
+    smallDish.position.set(-5.35, 4.35, -0.15);
+    smallDish.rotation.set(-0.42, 0.82, 0);
+    smallDish.scale.z = 0.28;
+    smallDish.castShadow = true;
+    baseStationGroup.add(smallDish);
+    addStationCylinder(new THREE.Vector3(-5.35, 0.45, -0.15), new THREE.Vector3(-5.35, 4.0, -0.15), 0.05, stationMaterials.steel);
+    addStationMesh(new THREE.BoxGeometry(2.15, 2.35, 1.75), stationMaterials.white, new THREE.Vector3(-5.15, 1.78, 2.25));
 
     // ============================================
     // 5. 海面
