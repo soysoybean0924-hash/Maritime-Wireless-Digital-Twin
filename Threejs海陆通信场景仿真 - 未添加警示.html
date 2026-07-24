@@ -6,8 +6,27 @@
   <title>Three.js 海陆通信场景 - 基站 & 海上接收机</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { overflow: hidden; background: #000; font-family: 'Microsoft YaHei', sans-serif; }
+    body {
+      overflow-x: hidden;
+      overflow-y: auto;
+      background: #05080d;
+      font-family: 'Microsoft YaHei', sans-serif;
+    }
     canvas { display: block; }
+
+    #scene-root {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #scene-root > canvas {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+    }
 
     #info-panel {
       position: absolute;
@@ -21,6 +40,7 @@
       pointer-events: none;
       backdrop-filter: blur(10px);
       min-width: 280px;
+      z-index: 3;
     }
     #info-panel h2 {
       font-size: 18px;
@@ -86,6 +106,7 @@
       font-size: 12px;
       pointer-events: none;
       backdrop-filter: blur(10px);
+      z-index: 3;
     }
 
     /* 右侧基站参数面板 */
@@ -102,6 +123,7 @@
       backdrop-filter: blur(10px);
       font-size: 12px;
       max-width: 220px;
+      z-index: 3;
     }
     #bs-panel h3 {
       font-size: 14px;
@@ -146,6 +168,7 @@
       backdrop-filter: blur(10px);
       font-size: 12px;
       max-width: 200px;
+      z-index: 3;
     }
     #duct-panel h3 {
       font-size: 13px;
@@ -174,6 +197,7 @@
       backdrop-filter: blur(10px);
       font-size: 11px;
       max-width: 200px;
+      z-index: 3;
     }
     #env-panel h3 {
       font-size: 12px;
@@ -203,6 +227,7 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
+      z-index: 3;
     }
     #analysis-panel h3 {
       font-size: 12px;
@@ -225,10 +250,137 @@
       font-size: 11px;
       pointer-events: none;
       backdrop-filter: blur(10px);
+      z-index: 3;
+    }
+
+    #tuning-panel {
+      min-height: 100vh;
+      padding: 42px clamp(18px, 4vw, 56px) 56px;
+      background:
+        linear-gradient(180deg, #07111b 0%, #0d1721 42%, #10151b 100%);
+      color: #edf6ff;
+    }
+    #tuning-panel .tuning-shell {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+    }
+    #tuning-panel h2 {
+      font-size: clamp(22px, 3vw, 34px);
+      margin-bottom: 8px;
+      color: #f4fbff;
+      font-weight: 700;
+    }
+    #tuning-panel .tuning-subtitle {
+      color: #8fb3c7;
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    .tuning-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .control-card {
+      background: rgba(8, 18, 28, 0.86);
+      border: 1px solid rgba(129, 212, 250, 0.16);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+    }
+    .control-card h3 {
+      font-size: 15px;
+      color: #81d4fa;
+      margin-bottom: 14px;
+    }
+    .control-row {
+      display: grid;
+      grid-template-columns: minmax(104px, 1fr) 1.2fr 74px;
+      gap: 10px;
+      align-items: center;
+      margin: 12px 0;
+      color: #b7cddb;
+      font-size: 13px;
+    }
+    .control-row input[type="range"] {
+      width: 100%;
+      accent-color: #4fc3f7;
+    }
+    .control-row output,
+    .control-row .readout {
+      color: #fff3c4;
+      font-family: 'Consolas', 'Courier New', monospace;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .toggle-row,
+    .select-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 12px 0;
+      color: #b7cddb;
+      font-size: 13px;
+    }
+    .toggle-row input {
+      width: 18px;
+      height: 18px;
+      accent-color: #4fc3f7;
+    }
+    .select-row select {
+      min-width: 150px;
+      border: 1px solid rgba(129, 212, 250, 0.28);
+      background: #111c26;
+      color: #edf6ff;
+      border-radius: 6px;
+      padding: 7px 9px;
+    }
+    .preset-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .preset-buttons button,
+    .action-button {
+      border: 1px solid rgba(129, 212, 250, 0.26);
+      background: rgba(79, 195, 247, 0.12);
+      color: #e7f7ff;
+      border-radius: 6px;
+      padding: 8px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.18s, transform 0.18s;
+    }
+    .preset-buttons button:hover,
+    .action-button:hover {
+      background: rgba(79, 195, 247, 0.22);
+      transform: translateY(-1px);
+    }
+    .wide-card {
+      grid-column: span 2;
+    }
+    @media (max-width: 960px) {
+      .tuning-grid {
+        grid-template-columns: 1fr;
+      }
+      .wide-card {
+        grid-column: span 1;
+      }
+    }
+    @media (max-width: 560px) {
+      .control-row {
+        grid-template-columns: 1fr;
+      }
+      .control-row output,
+      .control-row .readout {
+        text-align: left;
+      }
     }
   </style>
 </head>
 <body>
+  <div id="scene-root">
   <!-- 信号实时数据面板 -->
   <div id="info-panel">
     <h2>📡 实时信号监测</h2>
@@ -274,17 +426,18 @@
   <!-- 基站工程参数面板 -->
   <div id="bs-panel">
     <h3>🗼 基站工程参数</h3>
-    <div class="param-row"><span class="param-label">发射功率</span><span class="param-value">43 dBm (20W)</span></div>
-    <div class="param-row"><span class="param-label">频率</span><span class="param-value">2600 MHz</span></div>
+    <div class="param-row"><span class="param-label">发射功率</span><span class="param-value" id="bs-tx-power">43 dBm (20W)</span></div>
+    <div class="param-row"><span class="param-label">频率</span><span class="param-value" id="bs-frequency">2600 MHz</span></div>
     <div class="param-row"><span class="param-label">带宽</span><span class="param-value">20 MHz</span></div>
     <div class="param-row"><span class="param-label">Tx 天线增益</span><span class="param-value">17 dBi</span></div>
-    <div class="param-row"><span class="param-label">Tx 天线高度</span><span class="param-value">25 m</span></div>
+    <div class="param-row"><span class="param-label">Tx 天线高度</span><span class="param-value" id="bs-tx-height">25 m</span></div>
+    <div class="param-row"><span class="param-label">基站海拔</span><span class="param-value" id="bs-elevation">1.4 m</span></div>
     <div class="param-row"><span class="param-label">天线类型</span><span class="param-value">定向板状</span></div>
     <div class="param-row"><span class="param-label">波束宽度</span><span class="param-value">65° H / 8° V</span></div>
     <div class="param-row"><span class="param-label">馈线损耗</span><span class="param-value">3 dB</span></div>
     <div style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;">
       <div class="param-row"><span class="param-label">Rx 天线增益</span><span class="param-value">10 dBi</span></div>
-      <div class="param-row"><span class="param-label">Rx 天线高度</span><span class="param-value">3 m</span></div>
+      <div class="param-row"><span class="param-label">Rx 天线高度</span><span class="param-value" id="bs-rx-height">3 m</span></div>
       <div class="param-row"><span class="param-label">Rx 噪声系数</span><span class="param-value">5 dB</span></div>
     </div>
   </div>
@@ -328,6 +481,66 @@
     <div class="env-row"><span class="env-label">大气压 (P)</span><span class="env-value" id="env-pres">1013 hPa</span></div>
     <div class="env-row"><span class="env-label">ASTD</span><span class="env-value" id="env-astd">-3.0 °C</span></div>
   </div>
+  </div>
+
+  <section id="tuning-panel" aria-label="仿真参数调节">
+    <div class="tuning-shell">
+      <h2>仿真参数调节台</h2>
+      <p class="tuning-subtitle">向下滚动到这里后，可以实时调整海洋气象、波浪、船舶轨迹、基站高度和波导层显示。</p>
+      <div class="tuning-grid">
+        <div class="control-card">
+          <h3>海洋气象环境</h3>
+          <label class="toggle-row"><span>自动气象漂移</span><input id="ctrl-auto-weather" type="checkbox" checked></label>
+          <label class="control-row"><span>气温</span><input id="ctrl-air-temp" type="range" min="15" max="35" step="0.1" value="26.5"><output id="out-air-temp">26.5 °C</output></label>
+          <label class="control-row"><span>海温</span><input id="ctrl-sea-temp" type="range" min="15" max="35" step="0.1" value="29"><output id="out-sea-temp">29.0 °C</output></label>
+          <label class="control-row"><span>相对湿度</span><input id="ctrl-rh" type="range" min="35" max="100" step="1" value="90"><output id="out-rh">90 %</output></label>
+          <label class="control-row"><span>风速</span><input id="ctrl-wind" type="range" min="0.5" max="20" step="0.1" value="5"><output id="out-wind">5.0 m/s</output></label>
+          <label class="control-row"><span>大气压</span><input id="ctrl-pressure" type="range" min="980" max="1040" step="1" value="1013"><output id="out-pressure">1013 hPa</output></label>
+          <div class="preset-buttons">
+            <button type="button" data-env-preset="strong">强波导</button>
+            <button type="button" data-env-preset="typical">典型海域</button>
+            <button type="button" data-env-preset="none">无波导</button>
+            <button type="button" data-env-preset="extreme">极端波导</button>
+          </div>
+        </div>
+
+        <div class="control-card">
+          <h3>波浪与海况</h3>
+          <label class="control-row"><span>浪高倍率</span><input id="ctrl-wave-height" type="range" min="0.2" max="2.4" step="0.05" value="1"><output id="out-wave-height">1.00x</output></label>
+          <label class="control-row"><span>浪速倍率</span><input id="ctrl-wave-speed" type="range" min="0.3" max="2.5" step="0.05" value="1"><output id="out-wave-speed">1.00x</output></label>
+          <label class="control-row"><span>船体摇摆</span><input id="ctrl-boat-roll" type="range" min="0" max="1.5" step="0.05" value="0.7"><output id="out-boat-roll">0.70x</output></label>
+        </div>
+
+        <div class="control-card">
+          <h3>船舶轨迹</h3>
+          <label class="select-row"><span>轨迹模式</span><select id="ctrl-boat-mode"><option value="drift">随浪漂移</option><option value="circle">环形巡航</option><option value="patrol">往返巡航</option><option value="manual">手动定位</option></select></label>
+          <label class="control-row"><span>航速</span><input id="ctrl-boat-speed" type="range" min="0" max="6" step="0.1" value="1.2"><output id="out-boat-speed">1.2 m/s</output></label>
+          <label class="control-row"><span>轨迹半径</span><input id="ctrl-boat-radius" type="range" min="8" max="48" step="1" value="24"><output id="out-boat-radius">24 m</output></label>
+          <label class="control-row"><span>手动 X</span><input id="ctrl-boat-x" type="range" min="-5" max="55" step="1" value="25"><output id="out-boat-x">25 m</output></label>
+          <label class="control-row"><span>手动 Z</span><input id="ctrl-boat-z" type="range" min="-35" max="55" step="1" value="20"><output id="out-boat-z">20 m</output></label>
+          <button class="action-button" id="ctrl-focus-boat" type="button">聚焦船只</button>
+        </div>
+
+        <div class="control-card wide-card">
+          <h3>基站与链路工程参数</h3>
+          <label class="control-row"><span>基站海拔</span><input id="ctrl-base-elevation" type="range" min="0.5" max="12" step="0.1" value="1.35"><output id="out-base-elevation">1.4 m</output></label>
+          <label class="control-row"><span>Tx 天线高度</span><input id="ctrl-tx-height" type="range" min="4" max="45" step="0.5" value="25"><output id="out-tx-height">25.0 m</output></label>
+          <label class="control-row"><span>Rx 天线高度</span><input id="ctrl-rx-height" type="range" min="1" max="18" step="0.5" value="3"><output id="out-rx-height">3.0 m</output></label>
+          <label class="control-row"><span>通信频率</span><input id="ctrl-frequency" type="range" min="700" max="6000" step="50" value="2600"><output id="out-frequency">2600 MHz</output></label>
+          <label class="control-row"><span>发射功率</span><input id="ctrl-tx-power" type="range" min="20" max="55" step="1" value="43"><output id="out-tx-power">43 dBm</output></label>
+        </div>
+
+        <div class="control-card">
+          <h3>波导层高度</h3>
+          <label class="toggle-row"><span>按气象自动计算</span><input id="ctrl-duct-auto" type="checkbox" checked></label>
+          <label class="control-row"><span>手动波导高度</span><input id="ctrl-duct-height" type="range" min="0" max="35" step="0.5" value="12"><output id="out-duct-height">自动</output></label>
+          <label class="control-row"><span>显示透明度</span><input id="ctrl-duct-opacity" type="range" min="0.03" max="0.45" step="0.01" value="0.16"><output id="out-duct-opacity">0.16</output></label>
+          <label class="toggle-row"><span>水平非均匀波导</span><input id="ctrl-inhomogeneous" type="checkbox"></label>
+          <button class="action-button" id="ctrl-recompute" type="button">重新计算信道</button>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <!-- Three.js Import Map -->
   <script type="importmap">
@@ -343,6 +556,32 @@
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+    const sceneRoot = document.getElementById('scene-root');
+    const simulationControls = {
+      autoWeather: true,
+      ductAuto: true,
+      ductHeightManual: 12,
+      ductOpacity: 0.16,
+      waveHeightScale: 1,
+      waveSpeedScale: 1,
+      boatRollScale: 0.7,
+      boatMode: 'drift',
+      boatSpeed: 1.2,
+      boatRadius: 24,
+      boatManualX: 25,
+      boatManualZ: 20,
+      boatPhase: 0,
+      boatPatrolDir: 1,
+    };
+
+    const envPresets = {
+      strong:  { airTemp: 26, seaTemp: 28, rh: 88, windSpeed: 3,  pressure: 1013 },
+      typical: { airTemp: 28, seaTemp: 25, rh: 75, windSpeed: 6,  pressure: 1013 },
+      none:    { airTemp: 30, seaTemp: 24, rh: 50, windSpeed: 14, pressure: 1013 },
+      extreme: { airTemp: 22, seaTemp: 29, rh: 95, windSpeed: 2,  pressure: 1013 },
+      neutral: { airTemp: 25, seaTemp: 25, rh: 60, windSpeed: 10, pressure: 1013 },
+    };
 
     // ============================================
     // 0. 基站工程定义 & 信号传播模型
@@ -899,6 +1138,7 @@
       positionY: 1.6 + 17.5,
       positionZ: -22,
     };
+    let txAntennaLocalY = baseStationConfig.txHeight - 7.5;
 
     /**
      * 海洋无线传播模型 — 集成了蒸发波导效应
@@ -1028,6 +1268,12 @@
 
     // 初始化传播模型 (集成了蒸发波导)
     const propagationModel = new MaritimePropagationModel(baseStationConfig, ductModel);
+
+    const refreshPropagationDerived = () => {
+      propagationModel.wavelength = propagationModel.c / (baseStationConfig.frequency * 1e6);
+      propagationModel.eirp = baseStationConfig.txPower + baseStationConfig.txAntennaGain - baseStationConfig.txCableLoss;
+      propagationModel.criticalDistance = (4 * Math.PI * baseStationConfig.txHeight * baseStationConfig.rxHeight) / propagationModel.wavelength;
+    };
 
     // ============================================================
     // 抛物方程 (PE) 传播求解器 — Split-Step Fourier 方法
@@ -1403,15 +1649,17 @@
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
-    document.body.appendChild(renderer.domElement);
+    sceneRoot.appendChild(renderer.domElement);
 
     // CSS2D 文字标签渲染器
     const labelRenderer = new CSS2DRenderer();
     labelRenderer.setSize(window.innerWidth, window.innerHeight);
     labelRenderer.domElement.style.position = 'absolute';
     labelRenderer.domElement.style.top = '0';
+    labelRenderer.domElement.style.left = '0';
+    labelRenderer.domElement.style.zIndex = '1';
     labelRenderer.domElement.style.pointerEvents = 'none';
-    document.body.appendChild(labelRenderer.domElement);
+    sceneRoot.appendChild(labelRenderer.domElement);
 
     // 相机
     const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 800);
@@ -1959,7 +2207,7 @@
       ductPlane.position.y = ductTopY;
       ductEdge.position.y = ductTopY;
       // 波导平面/框: 有波导时明显, 无波导时淡
-      ductPlane.material.opacity = hasDuct ? 0.12 : 0.02;
+      ductPlane.material.opacity = hasDuct ? simulationControls.ductOpacity : 0.02;
       ductEdge.material.opacity = hasDuct ? 0.6 : 0.08;
 
       // 颜色: 强波导 = 深橙, 弱 = 淡黄
@@ -1974,7 +2222,7 @@
 
       // 重新创建装饰射线 (现有射线追踪已处理真正物理射线)
       if (hasDuct) {
-        const txOrigin = new THREE.Vector3(0, 17.5, 0);
+        const txOrigin = new THREE.Vector3(0, txAntennaLocalY, 0);
         baseStationGroup.localToWorld(txOrigin);
         const numRays = Math.floor(ductModel.ductHeight / 3) + 3;
         for (let i = 0; i < numRays; i++) {
@@ -2218,7 +2466,7 @@
         commLinkGroup.remove(c);
       }
 
-      const startPos = new THREE.Vector3(0, 17.5, 0);
+      const startPos = new THREE.Vector3(0, txAntennaLocalY, 0);
       baseStationGroup.localToWorld(startPos);
       const endPos = new THREE.Vector3();
       receiverGroup.getWorldPosition(endPos);
@@ -2734,7 +2982,7 @@
       drawPathLossCurves();
 
       // 更新传播时延
-      const txWorld = new THREE.Vector3(0, 17.5, 0);
+      const txWorld = new THREE.Vector3(0, txAntennaLocalY, 0);
       baseStationGroup.localToWorld(txWorld);
       const rxWorld = new THREE.Vector3();
       receiverGroup.getWorldPosition(rxWorld);
@@ -2851,7 +3099,7 @@
       clearRayFan();
 
       // 从基站天线位置发射
-      const origin = new THREE.Vector3(0, 17.5, 0);
+      const origin = new THREE.Vector3(0, txAntennaLocalY, 0);
       baseStationGroup.localToWorld(origin);
 
       const createEscapeCurvePoints = (txOrigin, elev, azimuth) => {
@@ -3003,7 +3251,7 @@
       if (hasDuct) {
         const inten = Math.min(1, ductModel.ductStrength / 15);
         const r = 1.0, g = 0.55 + (1 - inten) * 0.3, b = 0.1 + (1 - inten) * 0.2;
-        waveGuideShell.material.opacity = 0.08 + inten * 0.18;
+        waveGuideShell.material.opacity = simulationControls.ductOpacity * (0.65 + inten * 0.7);
         waveGuideShell.material.color.setRGB(r, g, b);
         ringMat2.color.setRGB(r, g * 0.9, b * 0.8);
         ringMat2.opacity = 0.4 + inten * 0.4;
@@ -3033,6 +3281,190 @@
     updateRayFan();
     updateDuctShell();
     updateDuctVisualization();
+
+    let scheduledRecompute = null;
+
+    const applyDuctHeightOverride = () => {
+      if (simulationControls.ductAuto) return;
+      const h = Math.max(0, Math.min(35, simulationControls.ductHeightManual));
+      ductModel.ductHeight = h;
+      ductModel.isTrapping = h > 0.01;
+      ductModel.criticalFreq = h > 0.01 ? (100.0 / Math.pow(h, 1.5)) * 1000 : 0;
+      if (h <= 0.01) ductModel.ductStrength = 0;
+      else ductModel.ductStrength = Math.max(ductModel.ductStrength, 4 + h * 0.22);
+    };
+
+    const applyEnvironmentFromControls = () => {
+      ductModel.setEnvironment({
+        airTemp: Number(document.getElementById('ctrl-air-temp').value),
+        seaTemp: Number(document.getElementById('ctrl-sea-temp').value),
+        rh: Number(document.getElementById('ctrl-rh').value),
+        windSpeed: Number(document.getElementById('ctrl-wind').value),
+        pressure: Number(document.getElementById('ctrl-pressure').value),
+      });
+      applyDuctHeightOverride();
+    };
+
+    const syncControlOutputs = () => {
+      document.getElementById('out-air-temp').textContent = `${ductModel.airTemp.toFixed(1)} °C`;
+      document.getElementById('out-sea-temp').textContent = `${ductModel.seaTemp.toFixed(1)} °C`;
+      document.getElementById('out-rh').textContent = `${ductModel.rh.toFixed(0)} %`;
+      document.getElementById('out-wind').textContent = `${ductModel.windSpeed.toFixed(1)} m/s`;
+      document.getElementById('out-pressure').textContent = `${ductModel.pressure.toFixed(0)} hPa`;
+      document.getElementById('out-wave-height').textContent = `${simulationControls.waveHeightScale.toFixed(2)}x`;
+      document.getElementById('out-wave-speed').textContent = `${simulationControls.waveSpeedScale.toFixed(2)}x`;
+      document.getElementById('out-boat-roll').textContent = `${simulationControls.boatRollScale.toFixed(2)}x`;
+      document.getElementById('out-boat-speed').textContent = `${simulationControls.boatSpeed.toFixed(1)} m/s`;
+      document.getElementById('out-boat-radius').textContent = `${simulationControls.boatRadius.toFixed(0)} m`;
+      document.getElementById('out-boat-x').textContent = `${simulationControls.boatManualX.toFixed(0)} m`;
+      document.getElementById('out-boat-z').textContent = `${simulationControls.boatManualZ.toFixed(0)} m`;
+      document.getElementById('out-base-elevation').textContent = `${baseStationGroup.position.y.toFixed(1)} m`;
+      document.getElementById('out-tx-height').textContent = `${baseStationConfig.txHeight.toFixed(1)} m`;
+      document.getElementById('out-rx-height').textContent = `${baseStationConfig.rxHeight.toFixed(1)} m`;
+      document.getElementById('out-frequency').textContent = `${baseStationConfig.frequency.toFixed(0)} MHz`;
+      document.getElementById('out-tx-power').textContent = `${baseStationConfig.txPower.toFixed(0)} dBm`;
+      document.getElementById('out-duct-height').textContent =
+        simulationControls.ductAuto ? '自动' : `${ductModel.ductHeight.toFixed(1)} m`;
+      document.getElementById('out-duct-opacity').textContent = simulationControls.ductOpacity.toFixed(2);
+
+      document.getElementById('bs-tx-power').textContent = `${baseStationConfig.txPower.toFixed(0)} dBm`;
+      document.getElementById('bs-frequency').textContent = `${baseStationConfig.frequency.toFixed(0)} MHz`;
+      document.getElementById('bs-tx-height').textContent = `${baseStationConfig.txHeight.toFixed(1)} m`;
+      document.getElementById('bs-rx-height').textContent = `${baseStationConfig.rxHeight.toFixed(1)} m`;
+      document.getElementById('bs-elevation').textContent = `${baseStationGroup.position.y.toFixed(1)} m`;
+    };
+
+    const refreshSimulation = ({ recomputePE = false } = {}) => {
+      refreshPropagationDerived();
+      applyDuctHeightOverride();
+      commLinkData = createCommLink();
+      updateDuctVisualization();
+      updateDuctShell();
+      updateRayFan();
+      updateAnalysisCharts();
+      if (recomputePE) updatePEField();
+      syncControlOutputs();
+    };
+
+    const scheduleSimulationRefresh = () => {
+      refreshSimulation();
+      window.clearTimeout(scheduledRecompute);
+      scheduledRecompute = window.setTimeout(() => refreshSimulation({ recomputePE: true }), 180);
+    };
+
+    const setEnvironmentControlValues = ({ airTemp, seaTemp, rh, windSpeed, pressure }) => {
+      document.getElementById('ctrl-air-temp').value = airTemp;
+      document.getElementById('ctrl-sea-temp').value = seaTemp;
+      document.getElementById('ctrl-rh').value = rh;
+      document.getElementById('ctrl-wind').value = windSpeed;
+      document.getElementById('ctrl-pressure').value = pressure;
+    };
+
+    const applyEnvPreset = (name) => {
+      const preset = envPresets[name];
+      if (!preset) return;
+      simulationControls.autoWeather = false;
+      document.getElementById('ctrl-auto-weather').checked = false;
+      setEnvironmentControlValues(preset);
+      applyEnvironmentFromControls();
+      scheduleSimulationRefresh();
+    };
+
+    const initializeTuningControls = () => {
+      setEnvironmentControlValues({
+        airTemp: ductModel.airTemp,
+        seaTemp: ductModel.seaTemp,
+        rh: ductModel.rh,
+        windSpeed: ductModel.windSpeed,
+        pressure: ductModel.pressure,
+      });
+
+      const bindNumber = (id, setter) => {
+        document.getElementById(id).addEventListener('input', (event) => {
+          setter(Number(event.target.value));
+          scheduleSimulationRefresh();
+        });
+      };
+
+      ['ctrl-air-temp', 'ctrl-sea-temp', 'ctrl-rh', 'ctrl-wind', 'ctrl-pressure'].forEach(id => {
+        document.getElementById(id).addEventListener('input', () => {
+          simulationControls.autoWeather = false;
+          document.getElementById('ctrl-auto-weather').checked = false;
+          applyEnvironmentFromControls();
+          scheduleSimulationRefresh();
+        });
+      });
+
+      document.getElementById('ctrl-auto-weather').addEventListener('change', (event) => {
+        simulationControls.autoWeather = event.target.checked;
+        syncControlOutputs();
+      });
+      document.getElementById('ctrl-duct-auto').addEventListener('change', (event) => {
+        simulationControls.ductAuto = event.target.checked;
+        if (simulationControls.ductAuto) applyEnvironmentFromControls();
+        scheduleSimulationRefresh();
+      });
+      document.getElementById('ctrl-inhomogeneous').addEventListener('change', (event) => {
+        useInhomogeneous = event.target.checked;
+        scheduleSimulationRefresh();
+      });
+
+      bindNumber('ctrl-wave-height', value => { simulationControls.waveHeightScale = value; });
+      bindNumber('ctrl-wave-speed', value => { simulationControls.waveSpeedScale = value; });
+      bindNumber('ctrl-boat-roll', value => { simulationControls.boatRollScale = value; });
+      bindNumber('ctrl-boat-speed', value => { simulationControls.boatSpeed = value; });
+      bindNumber('ctrl-boat-radius', value => { simulationControls.boatRadius = value; });
+      bindNumber('ctrl-boat-x', value => {
+        simulationControls.boatManualX = value;
+        if (simulationControls.boatMode === 'manual') boatGroup.position.x = value;
+      });
+      bindNumber('ctrl-boat-z', value => {
+        simulationControls.boatManualZ = value;
+        if (simulationControls.boatMode === 'manual') boatGroup.position.z = value;
+      });
+      bindNumber('ctrl-base-elevation', value => {
+        baseStationGroup.position.y = value;
+        baseStationConfig.positionY = value + txAntennaLocalY;
+      });
+      bindNumber('ctrl-tx-height', value => {
+        baseStationConfig.txHeight = value;
+        txAntennaLocalY = Math.max(3, value - 7.5);
+        baseStationConfig.positionY = baseStationGroup.position.y + txAntennaLocalY;
+      });
+      bindNumber('ctrl-rx-height', value => { baseStationConfig.rxHeight = value; });
+      bindNumber('ctrl-frequency', value => { baseStationConfig.frequency = value; });
+      bindNumber('ctrl-tx-power', value => { baseStationConfig.txPower = value; });
+      bindNumber('ctrl-duct-height', value => {
+        simulationControls.ductHeightManual = value;
+        simulationControls.ductAuto = false;
+        document.getElementById('ctrl-duct-auto').checked = false;
+      });
+      bindNumber('ctrl-duct-opacity', value => { simulationControls.ductOpacity = value; });
+
+      document.getElementById('ctrl-boat-mode').addEventListener('change', (event) => {
+        simulationControls.boatMode = event.target.value;
+        simulationControls.boatPhase = 0;
+        if (simulationControls.boatMode === 'manual') {
+          boatGroup.position.x = simulationControls.boatManualX;
+          boatGroup.position.z = simulationControls.boatManualZ;
+        }
+        scheduleSimulationRefresh();
+      });
+      document.getElementById('ctrl-focus-boat').addEventListener('click', () => {
+        controls.target.copy(boatGroup.position);
+        controls.update();
+      });
+      document.getElementById('ctrl-recompute').addEventListener('click', () => {
+        refreshSimulation({ recomputePE: true });
+      });
+      document.querySelectorAll('[data-env-preset]').forEach(button => {
+        button.addEventListener('click', () => applyEnvPreset(button.dataset.envPreset));
+      });
+
+      syncControlOutputs();
+    };
+
+    initializeTuningControls();
 
     // ============================================
     // 10. 环境细节
@@ -3319,9 +3751,10 @@
       // JS 海面波浪动画
       const waveFunc = (px, pz, t, amp, freq, speed, dirX, dirZ) => {
         const dotVal = px * dirX + pz * dirZ;
-        return amp * Math.sin(dotVal * freq + t * speed)
-             * Math.cos(pz * freq * 0.7 + t * speed * 0.6)
-             * Math.sin(px * freq * 0.5 + t * speed * 0.8);
+        const scaledSpeed = speed * simulationControls.waveSpeedScale;
+        return amp * simulationControls.waveHeightScale * Math.sin(dotVal * freq + t * scaledSpeed)
+             * Math.cos(pz * freq * 0.7 + t * scaledSpeed * 0.6)
+             * Math.sin(px * freq * 0.5 + t * scaledSpeed * 0.8);
       };
       for (let i = 0; i < oceanVertices.count; i++) {
         const px = oceanVertices.getX(i);
@@ -3347,9 +3780,10 @@
         let h = 0;
         const wave = (p, t_, amp, freq, speed, dirX, dirZ) => {
           const dotVal = p[0] * dirX + p[1] * dirZ;
-          return amp * Math.sin(dotVal * freq + t_ * speed) *
-                       Math.cos(p[1] * freq * 0.7 + t_ * speed * 0.6) *
-                       Math.sin(p[0] * freq * 0.5 + t_ * speed * 0.8);
+          const scaledSpeed = speed * simulationControls.waveSpeedScale;
+          return amp * simulationControls.waveHeightScale * Math.sin(dotVal * freq + t_ * scaledSpeed) *
+                       Math.cos(p[1] * freq * 0.7 + t_ * scaledSpeed * 0.6) *
+                       Math.sin(p[0] * freq * 0.5 + t_ * scaledSpeed * 0.8);
         };
         h += wave([px, pz], t, 1.8, 0.15, 0.8, 0.7, 0.7);
         h += wave([px, pz], t, 1.2, 0.25, 1.1, -0.5, 0.8);
@@ -3374,12 +3808,30 @@
       const hF = sampleWaveHeight(boatWorldX - 5, boatWorldZ - 5 - eps);
       const hB = sampleWaveHeight(boatWorldX - 5, boatWorldZ - 5 + eps);
 
-      boatGroup.rotation.z = Math.atan2(hR - hL, eps * 2) * 0.7;
-      boatGroup.rotation.x = Math.atan2(hF - hB, eps * 2) * 0.7;
+      boatGroup.rotation.z = Math.atan2(hR - hL, eps * 2) * simulationControls.boatRollScale;
+      boatGroup.rotation.x = Math.atan2(hF - hB, eps * 2) * simulationControls.boatRollScale;
 
-      // 船只缓慢漂移
-      boatGroup.position.x += Math.sin(elapsed * 0.3) * 0.03;
-      boatGroup.position.z += Math.cos(elapsed * 0.25) * 0.03;
+      // 船只轨迹
+      if (simulationControls.boatMode === 'drift') {
+        boatGroup.position.x += Math.sin(elapsed * 0.3) * 0.03 * simulationControls.boatSpeed;
+        boatGroup.position.z += Math.cos(elapsed * 0.25) * 0.03 * simulationControls.boatSpeed;
+      } else if (simulationControls.boatMode === 'circle') {
+        simulationControls.boatPhase += dt * simulationControls.boatSpeed / Math.max(simulationControls.boatRadius, 1);
+        boatGroup.position.x = 25 + Math.cos(simulationControls.boatPhase) * simulationControls.boatRadius;
+        boatGroup.position.z = 12 + Math.sin(simulationControls.boatPhase) * simulationControls.boatRadius;
+        boatGroup.rotation.y = -simulationControls.boatPhase + Math.PI * 0.5;
+      } else if (simulationControls.boatMode === 'patrol') {
+        boatGroup.position.x += simulationControls.boatPatrolDir * simulationControls.boatSpeed * dt;
+        if (boatGroup.position.x > 50 || boatGroup.position.x < 8) {
+          simulationControls.boatPatrolDir *= -1;
+          boatGroup.position.x = THREE.MathUtils.clamp(boatGroup.position.x, 8, 50);
+        }
+        boatGroup.position.z = 16 + Math.sin(elapsed * 0.45) * simulationControls.boatRadius * 0.35;
+        boatGroup.rotation.y = simulationControls.boatPatrolDir > 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
+      } else if (simulationControls.boatMode === 'manual') {
+        boatGroup.position.x = simulationControls.boatManualX;
+        boatGroup.position.z = simulationControls.boatManualZ;
+      }
 
       // 浮标随浪浮动
       buoy.position.y = 1 + sampleWaveHeight(35 - 5, 15 - 5);
@@ -3443,7 +3895,7 @@
       const dist3D = basePosWorld.distanceTo(boatGroup.position);
 
       // 每2秒微调环境参数 (模拟气象变化)
-      if (Math.floor(elapsed * 0.5) !== Math.floor((elapsed - dt) * 0.5)) {
+      if (simulationControls.autoWeather && Math.floor(elapsed * 0.5) !== Math.floor((elapsed - dt) * 0.5)) {
         // ASTD 微调 → 影响波导
         const astdDrift = (Math.sin(elapsed * 0.1) * 0.3 + (Math.random() - 0.5) * 0.4) * dt;
         const newSeaTemp = ductModel.seaTemp + astdDrift * 0.5;
@@ -3457,6 +3909,14 @@
           rh: newRH,
           windSpeed: newWind,
         });
+        applyDuctHeightOverride();
+        setEnvironmentControlValues({
+          airTemp: ductModel.airTemp,
+          seaTemp: ductModel.seaTemp,
+          rh: ductModel.rh,
+          windSpeed: ductModel.windSpeed,
+          pressure: ductModel.pressure,
+        });
 
         // 更新波导可视化
         updateDuctVisualization();
@@ -3464,6 +3924,7 @@
         updatePEField();
         updateRayFan();
         updateAnalysisCharts();
+        syncControlOutputs();
       }
 
       // 计算实际场景距离 (坐标系单位 ≈ 米)
@@ -3594,16 +4055,32 @@
       const speed = 1.5;
       switch (e.key.toLowerCase()) {
         case 'w':
+          simulationControls.boatMode = 'manual';
+          document.getElementById('ctrl-boat-mode').value = 'manual';
           boatGroup.position.z -= speed;
+          simulationControls.boatManualZ = boatGroup.position.z;
+          document.getElementById('ctrl-boat-z').value = simulationControls.boatManualZ;
           break;
         case 's':
+          simulationControls.boatMode = 'manual';
+          document.getElementById('ctrl-boat-mode').value = 'manual';
           boatGroup.position.z += speed;
+          simulationControls.boatManualZ = boatGroup.position.z;
+          document.getElementById('ctrl-boat-z').value = simulationControls.boatManualZ;
           break;
         case 'a':
+          simulationControls.boatMode = 'manual';
+          document.getElementById('ctrl-boat-mode').value = 'manual';
           boatGroup.position.x -= speed;
+          simulationControls.boatManualX = boatGroup.position.x;
+          document.getElementById('ctrl-boat-x').value = simulationControls.boatManualX;
           break;
         case 'd':
+          simulationControls.boatMode = 'manual';
+          document.getElementById('ctrl-boat-mode').value = 'manual';
           boatGroup.position.x += speed;
+          simulationControls.boatManualX = boatGroup.position.x;
+          document.getElementById('ctrl-boat-x').value = simulationControls.boatManualX;
           break;
         case 'r':
           camera.position.set(60, 35, 80);
@@ -3616,48 +4093,23 @@
           break;
         // ---- 环境参数控制 ----
         case '1':
-          ductModel.setEnvironment({ airTemp: 26, seaTemp: 28, rh: 88, windSpeed: 3 });
-          updateDuctVisualization();
-          updateDuctShell();
-          updatePEField();
-          updateRayFan();
-          updateAnalysisCharts();
+          applyEnvPreset('strong');
           console.log('🌫 强蒸发波导 (ASTD=-2°C, RH=88%, U=3m/s)');
           break;
         case '2':
-          ductModel.setEnvironment({ airTemp: 28, seaTemp: 25, rh: 75, windSpeed: 6 });
-          updateDuctVisualization();
-          updateDuctShell();
-          updatePEField();
-          updateRayFan();
-          updateAnalysisCharts();
+          applyEnvPreset('typical');
           console.log('🌤 典型海域 (ASTD=+3°C, RH=75%, U=6m/s)');
           break;
         case '3':
-          ductModel.setEnvironment({ airTemp: 30, seaTemp: 24, rh: 50, windSpeed: 14 });
-          updateDuctVisualization();
-          updateDuctShell();
-          updatePEField();
-          updateRayFan();
-          updateAnalysisCharts();
+          applyEnvPreset('none');
           console.log('💨 无波导 — 强风干燥 (ASTD=+6°C, RH=50%, U=14m/s)');
           break;
         case '4':
-          ductModel.setEnvironment({ airTemp: 22, seaTemp: 29, rh: 95, windSpeed: 2 });
-          updateDuctVisualization();
-          updateDuctShell();
-          updatePEField();
-          updateRayFan();
-          updateAnalysisCharts();
+          applyEnvPreset('extreme');
           console.log('🌊 极端蒸发波导 (ASTD=-7°C, RH=95%, U=2m/s)');
           break;
         case '5':
-          ductModel.setEnvironment({ airTemp: 25, seaTemp: 25, rh: 60, windSpeed: 10 });
-          updateDuctVisualization();
-          updateDuctShell();
-          updatePEField();
-          updateRayFan();
-          updateAnalysisCharts();
+          applyEnvPreset('neutral');
           console.log('☁ 中性大气 (ASTD=0°C) — 标准传播');
           break;
         // ---- 数据操作 ----
@@ -3668,17 +4120,14 @@
         case 'h':
           // 切换均匀/非均匀波导
           useInhomogeneous = !useInhomogeneous;
+          document.getElementById('ctrl-inhomogeneous').checked = useInhomogeneous;
           if (useInhomogeneous) {
             inhomogDuct.generateParamSequence(peSolver.NX, peSolver.DX, 3000);
             console.log('🌐 切换到水平非均匀波导 (马尔可夫链, 相关长度=3km)');
           } else {
             console.log('🌐 切换到水平均匀波导');
           }
-          updateDuctShell();
-          updatePEField();
-          updateRayFan();
-          updateAnalysisCharts();
-          updateDuctVisualization();
+          refreshSimulation({ recomputePE: true });
           break;
         case 'c':
           // 对比模式: 临时关闭波导效果
@@ -3688,28 +4137,35 @@
               seaTemp: ductModel.seaTemp,
               rh: ductModel.rh,
               windSpeed: ductModel.windSpeed,
+              pressure: ductModel.pressure,
             };
             // 强制无波导
             ductModel.setEnvironment({ airTemp: 30, seaTemp: 24, rh: 50, windSpeed: 14 });
+            applyDuctHeightOverride();
             updateDuctVisualization();
             updateDuctShell();
             updatePEField();
             updateRayFan();
             updateAnalysisCharts();
+            syncControlOutputs();
             console.log('📊 对比模式: 强制无波导条件');
             // 3秒后恢复
             setTimeout(() => {
               ductModel.setEnvironment(origEnv);
+              applyDuctHeightOverride();
               updateDuctVisualization();
               updateDuctShell();
               updatePEField();
               updateRayFan();
               updateAnalysisCharts();
+              setEnvironmentControlValues(origEnv);
+              syncControlOutputs();
               console.log('📊 已恢复原始波导条件');
             }, 3000);
           }
           break;
       }
+      syncControlOutputs();
     });
 
     // 启动
