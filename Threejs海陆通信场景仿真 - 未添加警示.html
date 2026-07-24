@@ -135,7 +135,7 @@
     /* 蒸发波导面板 */
     #duct-panel {
       position: absolute;
-      bottom: 80px;
+      bottom: 215px;
       right: 20px;
       background: rgba(0, 0, 0, 0.75);
       color: #fff;
@@ -1906,19 +1906,23 @@
     ductVisGroup.add(ductTrappedRaysGroup);
 
     // 预创建陷获射线的曲线
-    const createTrappedRay = (startX, startZ, angleOffset) => {
+    const createTrappedRay = (txOrigin, angleOffset) => {
       const points = [];
-      const startY = ductModel.ductHeight * 0.6;
-      const maxDist = 60;
-      const segments = 40;
+      const startX = txOrigin.x;
+      const startZ = txOrigin.z;
+      const startY = txOrigin.y;
+      const maxDist = 92;
+      const segments = 64;
       for (let i = 0; i <= segments; i++) {
         const t = i / segments;
         const dist = t * maxDist;
         const x = startX + Math.cos(angleOffset) * dist;
         const z = startZ + Math.sin(angleOffset) * dist;
-        // 射线在波导内上下振荡
-        const oscY = startY + Math.sin(t * Math.PI * 4) * ductModel.ductHeight * 0.35;
-        const y = Math.max(0.3, Math.min(ductModel.ductHeight * 0.9, oscY));
+        const settling = 1 - Math.exp(-t * 7);
+        const ductCenter = SEA_LEVEL + ductModel.ductHeight * (0.48 + 0.04 * Math.cos(t * Math.PI * 2));
+        const ductWave = Math.sin(t * Math.PI * 5.5 + angleOffset * 1.7) * ductModel.ductHeight * 0.32;
+        const guidedY = Math.max(SEA_LEVEL + 0.45, Math.min(SEA_LEVEL + ductModel.ductHeight * 0.88, ductCenter + ductWave));
+        const y = startY * (1 - settling) + guidedY * settling;
         points.push(new THREE.Vector3(x, y, z));
       }
       const curve = new THREE.CatmullRomCurve3(points);
@@ -1969,12 +1973,12 @@
 
       // 重新创建装饰射线 (现有射线追踪已处理真正物理射线)
       if (hasDuct) {
-        const bsWorld = new THREE.Vector3();
-        baseStationGroup.getWorldPosition(bsWorld);
+        const txOrigin = new THREE.Vector3(0, 17.5, 0);
+        baseStationGroup.localToWorld(txOrigin);
         const numRays = Math.floor(ductModel.ductHeight / 3) + 3;
         for (let i = 0; i < numRays; i++) {
           const angle = (i / numRays) * Math.PI * 0.7 - Math.PI * 0.35;
-          const ray = createTrappedRay(bsWorld.x + 5, bsWorld.z + 5, angle);
+          const ray = createTrappedRay(txOrigin, Math.PI * 0.35 + angle);
           ductTrappedRaysGroup.add(ray);
         }
       }
@@ -2849,6 +2853,38 @@
       const origin = new THREE.Vector3(0, 17.5, 0);
       baseStationGroup.localToWorld(origin);
 
+      const createEscapeCurvePoints = (txOrigin, elev, azimuth) => {
+        const pts = [];
+        const er = THREE.MathUtils.degToRad(elev);
+        const dirX = Math.cos(azimuth);
+        const dirZ = Math.sin(azimuth);
+        const rangeMax = 95 + elev * 1.55;
+        for (let i = 0; i <= 56; i++) {
+          const t = i / 56;
+          const range = t * rangeMax;
+          const lift = Math.sin(er) * range * 0.52 + t * t * (46 + elev * 0.42);
+          const atmosphericBend = Math.sin(t * Math.PI * 0.95) * (6 + elev * 0.06);
+          pts.push(new THREE.Vector3(
+            txOrigin.x + range * dirX,
+            txOrigin.y + lift + atmosphericBend,
+            txOrigin.z + range * dirZ
+          ));
+        }
+        return pts;
+      };
+
+      const addEscapeCurve = (elev, azimuth, opacity, radius) => {
+        const curve = new THREE.CatmullRomCurve3(createEscapeCurvePoints(origin, elev, azimuth));
+        const geo = new THREE.TubeGeometry(curve, 72, radius, 5, false);
+        const mat = new THREE.MeshBasicMaterial({
+          color: 0x00e676,
+          transparent: true,
+          opacity,
+          depthTest: true,
+        });
+        escapeRayGroup.add(new THREE.Mesh(geo, mat));
+      };
+
       // 前方海域方向
       const azim = Math.PI * 0.35;
       // 逃逸射线: 大仰角斜向上 → 穿透波导
@@ -2880,10 +2916,14 @@
           });
           trappedRayGroup.add(new THREE.Mesh(geo, mat));
         } else {
-          const geo = new THREE.BufferGeometry().setFromPoints(r.points);
-          const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthTest: true });
-          escapeRayGroup.add(new THREE.Line(geo, mat));
+          addEscapeCurve(elev, azim, opacity, 0.026);
         }
+      });
+
+      // 补充一组低仰角非陷获曲线，贴近射线轨迹图中逐渐上弯逃逸的形态
+      [12, 18, 24, 30, 36, 44].forEach((elev, idx) => {
+        const spread = (idx - 2.5) * 0.035;
+        addEscapeCurve(elev, azim + spread, 0.42 + idx * 0.035, 0.02);
       });
 
       // 侧面方向 (展示3D)
@@ -2891,9 +2931,7 @@
         angles.forEach(elev => {
           const r = ductRayTracer.trace(origin, elev, sideAz);
           if (r.points.length < 3 || r.trapped) return;
-          const geo = new THREE.BufferGeometry().setFromPoints(r.points);
-          const mat = new THREE.LineBasicMaterial({ color: 0x00e676, transparent: true, opacity: 0.55, depthTest: true });
-          escapeRayGroup.add(new THREE.Line(geo, mat));
+          addEscapeCurve(elev, sideAz, 0.5, 0.022);
         });
       });
     };
