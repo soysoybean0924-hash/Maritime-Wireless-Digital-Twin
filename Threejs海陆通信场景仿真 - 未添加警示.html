@@ -2858,29 +2858,34 @@
         const er = THREE.MathUtils.degToRad(elev);
         const dirX = Math.cos(azimuth);
         const dirZ = Math.sin(azimuth);
-        const rangeMax = 95 + elev * 1.55;
-        for (let i = 0; i <= 56; i++) {
-          const t = i / 56;
+        const rangeMax = 62 + elev * 0.92;
+        const nearDuctSag = Math.max(0, 30 - elev * 0.35);
+        const escapeLift = 17 + elev * 0.42;
+        for (let i = 0; i <= 72; i++) {
+          const t = i / 72;
           const range = t * rangeMax;
-          const lift = Math.sin(er) * range * 0.52 + t * t * (46 + elev * 0.42);
-          const atmosphericBend = Math.sin(t * Math.PI * 0.95) * (6 + elev * 0.06);
+          const launchSlope = Math.sin(er) * range * 0.26;
+          const refractiveSag = -Math.sin(t * Math.PI) * nearDuctSag;
+          const upwardEscape = Math.pow(t, 2.35) * escapeLift;
+          const ductSkim = Math.sin(t * Math.PI * 1.45) * Math.max(2.0, 10 - elev * 0.09);
+          const y = Math.max(SEA_LEVEL + 0.7, txOrigin.y + launchSlope + refractiveSag + upwardEscape + ductSkim);
           pts.push(new THREE.Vector3(
             txOrigin.x + range * dirX,
-            txOrigin.y + lift + atmosphericBend,
+            y,
             txOrigin.z + range * dirZ
           ));
         }
         return pts;
       };
 
-      const addEscapeCurve = (elev, azimuth, opacity, radius) => {
+      const addEscapeCurve = (elev, azimuth, opacity, radius, color = 0x00e676) => {
         const curve = new THREE.CatmullRomCurve3(createEscapeCurvePoints(origin, elev, azimuth));
-        const geo = new THREE.TubeGeometry(curve, 72, radius, 5, false);
+        const geo = new THREE.TubeGeometry(curve, 96, radius, 5, false);
         const mat = new THREE.MeshBasicMaterial({
-          color: 0x00e676,
+          color,
           transparent: true,
           opacity,
-          depthTest: true,
+          depthTest: false,
         });
         escapeRayGroup.add(new THREE.Mesh(geo, mat));
       };
@@ -2888,7 +2893,7 @@
       // 前方海域方向
       const azim = Math.PI * 0.35;
       // 逃逸射线: 大仰角斜向上 → 穿透波导
-      const angles = [50, 55, 60, 65, 70, 75, 80, 85];
+      const angles = [50, 58, 66, 74, 82];
 
       const hasDuct = ductModel.ductHeight > 0.5;
 
@@ -2916,14 +2921,16 @@
           });
           trappedRayGroup.add(new THREE.Mesh(geo, mat));
         } else {
-          addEscapeCurve(elev, azim, opacity, 0.026);
+          addEscapeCurve(elev, azim, Math.max(opacity, 0.9), 0.052, 0x00ff66);
         }
       });
 
-      // 补充一组低仰角非陷获曲线，贴近射线轨迹图中逐渐上弯逃逸的形态
-      [12, 18, 24, 30, 36, 44].forEach((elev, idx) => {
-        const spread = (idx - 2.5) * 0.035;
-        addEscapeCurve(elev, azim + spread, 0.42 + idx * 0.035, 0.02);
+      // 密集绿色非陷获射线族：低仰角先受折射下弯，再逐步抬升逃逸
+      [6, 9, 12, 15, 18, 22, 26, 31, 36, 42, 49, 57, 66, 76, 86].forEach((elev, idx) => {
+        const spread = (idx - 7) * 0.022;
+        const opacity = 0.82 + Math.min(idx, 7) * 0.02;
+        const color = elev < 20 ? 0x00ff66 : elev < 45 ? 0x35f6b0 : 0x8dfdd1;
+        addEscapeCurve(elev, azim + spread, opacity, 0.046, color);
       });
 
       // 侧面方向 (展示3D)
@@ -2931,7 +2938,7 @@
         angles.forEach(elev => {
           const r = ductRayTracer.trace(origin, elev, sideAz);
           if (r.points.length < 3 || r.trapped) return;
-          addEscapeCurve(elev, sideAz, 0.5, 0.022);
+          addEscapeCurve(elev, sideAz, 0.68, 0.034, 0x00ff66);
         });
       });
     };
