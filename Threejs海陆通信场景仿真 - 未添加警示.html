@@ -1683,7 +1683,7 @@
 
     // 使用 img2threejs 风格重建岸边 5G 基站：塔架、开放机柜、天线阵列和彩色线缆
     baseStationGroup.clear();
-    baseStationGroup.position.set(-12.5, 1.35, -8);
+    baseStationGroup.position.set(-20.5, 1.35, -8);
     baseStationGroup.rotation.y = -0.16;
     baseStationGroup.scale.setScalar(0.92);
 
@@ -1922,11 +1922,11 @@
         points.push(new THREE.Vector3(x, y, z));
       }
       const curve = new THREE.CatmullRomCurve3(points);
-      const geo = new THREE.TubeGeometry(curve, 30, 0.03, 4, false);
+      const geo = new THREE.TubeGeometry(curve, 36, 0.055, 6, false);
       const mat = new THREE.MeshBasicMaterial({
-        color: 0xffa726,
+        color: 0xffd54f,
         transparent: true,
-        opacity: 0.35,
+        opacity: 0.72,
         depthTest: true,
       });
       const mesh = new THREE.Mesh(geo, mat);
@@ -2869,7 +2869,17 @@
           color = 0x00e676; opacity = 0.75; // ⬜ 逃逸
         }
 
-        if (!r.trapped) {
+        if (r.trapped) {
+          const curve = new THREE.CatmullRomCurve3(r.points);
+          const geo = new THREE.TubeGeometry(curve, Math.max(24, r.points.length * 2), 0.065, 6, false);
+          const mat = new THREE.MeshBasicMaterial({
+            color: 0xffc107,
+            transparent: true,
+            opacity: 0.92,
+            depthTest: true
+          });
+          trappedRayGroup.add(new THREE.Mesh(geo, mat));
+        } else {
           const geo = new THREE.BufferGeometry().setFromPoints(r.points);
           const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthTest: true });
           escapeRayGroup.add(new THREE.Line(geo, mat));
