@@ -214,29 +214,35 @@
 
     /* 信道分析面板 */
     #analysis-panel {
-      position: absolute;
-      bottom: 20px;
-      left: 20px;
-      background: rgba(0, 0, 0, 0.78);
+      margin-top: 18px;
+      background: rgba(8, 18, 28, 0.86);
       color: #fff;
-      padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      pointer-events: none;
-      backdrop-filter: blur(10px);
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      z-index: 3;
+      padding: 18px;
+      border-radius: 8px;
+      border: 1px solid rgba(129, 212, 250, 0.16);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
     }
     #analysis-panel h3 {
-      font-size: 12px;
+      font-size: 15px;
       color: #81d4fa;
-      margin: 0;
+      margin: 0 0 14px 0;
+    }
+    .analysis-charts {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 12px;
     }
     #analysis-panel canvas {
+      width: 100%;
+      height: auto;
       border-radius: 4px;
       border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(0,0,0,0.28);
+    }
+    .analysis-footer {
+      color: #78909c;
+      font-size: 12px;
+      margin-top: 10px;
     }
     #export-hint {
       position: absolute;
@@ -367,6 +373,9 @@
       .wide-card {
         grid-column: span 1;
       }
+      .analysis-charts {
+        grid-template-columns: 1fr;
+      }
     }
     @media (max-width: 560px) {
       .control-row {
@@ -444,17 +453,6 @@
 
   <div id="controls-hint">
     🖱 鼠标拖拽旋转视角 | 滚轮缩放 | 右键平移 | ⌨ WASD 移动船只
-  </div>
-
-  <!-- 信道分析面板 -->
-  <div id="analysis-panel">
-    <h3>📊 信道建模数据 — M剖面 & 路径损耗</h3>
-    <canvas id="mprofile-canvas" width="360" height="140"></canvas>
-    <canvas id="pathloss-canvas" width="360" height="160"></canvas>
-    <div style="font-size:10px;color:#78909c;margin-top:2px;">
-      时延: <span id="delay-value" style="color:#ffcc80;">--</span> |
-      均匀/非均匀: <span id="homog-status" style="color:#81d4fa;">均匀</span>
-    </div>
   </div>
 
   <div id="export-hint" style="display:none;">
@@ -537,6 +535,19 @@
           <label class="control-row"><span>显示透明度</span><input id="ctrl-duct-opacity" type="range" min="0.03" max="0.45" step="0.01" value="0.16"><output id="out-duct-opacity">0.16</output></label>
           <label class="toggle-row"><span>水平非均匀波导</span><input id="ctrl-inhomogeneous" type="checkbox"></label>
           <button class="action-button" id="ctrl-recompute" type="button">重新计算信道</button>
+        </div>
+      </div>
+
+      <!-- 信道分析面板 -->
+      <div id="analysis-panel">
+        <h3>📊 信道建模数据 — M剖面 & 路径损耗</h3>
+        <div class="analysis-charts">
+          <canvas id="mprofile-canvas" width="360" height="140"></canvas>
+          <canvas id="pathloss-canvas" width="360" height="160"></canvas>
+        </div>
+        <div class="analysis-footer">
+          时延: <span id="delay-value" style="color:#ffcc80;">--</span> |
+          均匀/非均匀: <span id="homog-status" style="color:#81d4fa;">均匀</span>
         </div>
       </div>
     </div>
