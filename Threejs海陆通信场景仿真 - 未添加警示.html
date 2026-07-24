@@ -2858,16 +2858,16 @@
         const er = THREE.MathUtils.degToRad(elev);
         const dirX = Math.cos(azimuth);
         const dirZ = Math.sin(azimuth);
-        const rangeMax = 62 + elev * 0.92;
-        const nearDuctSag = Math.max(0, 30 - elev * 0.35);
-        const escapeLift = 17 + elev * 0.42;
+        const rangeMax = 44 + elev * 0.48;
+        const nearDuctSag = Math.max(0, 22 - elev * 0.26);
+        const escapeLift = 10 + elev * 0.24;
         for (let i = 0; i <= 72; i++) {
           const t = i / 72;
           const range = t * rangeMax;
-          const launchSlope = Math.sin(er) * range * 0.26;
+          const launchSlope = Math.sin(er) * range * 0.2;
           const refractiveSag = -Math.sin(t * Math.PI) * nearDuctSag;
-          const upwardEscape = Math.pow(t, 2.35) * escapeLift;
-          const ductSkim = Math.sin(t * Math.PI * 1.45) * Math.max(2.0, 10 - elev * 0.09);
+          const upwardEscape = Math.pow(t, 2.3) * escapeLift;
+          const ductSkim = Math.sin(t * Math.PI * 1.45) * Math.max(1.5, 7 - elev * 0.06);
           const y = Math.max(SEA_LEVEL + 0.7, txOrigin.y + launchSlope + refractiveSag + upwardEscape + ductSkim);
           pts.push(new THREE.Vector3(
             txOrigin.x + range * dirX,
@@ -2893,7 +2893,7 @@
       // 前方海域方向
       const azim = Math.PI * 0.35;
       // 逃逸射线: 大仰角斜向上 → 穿透波导
-      const angles = [50, 58, 66, 74, 82];
+      const angles = [52, 62, 72];
 
       const hasDuct = ductModel.ductHeight > 0.5;
 
@@ -2921,25 +2921,16 @@
           });
           trappedRayGroup.add(new THREE.Mesh(geo, mat));
         } else {
-          addEscapeCurve(elev, azim, Math.max(opacity, 0.9), 0.052, 0x00ff66);
+          addEscapeCurve(elev, azim, 0.52, 0.026, 0x66ff99);
         }
       });
 
-      // 密集绿色非陷获射线族：低仰角先受折射下弯，再逐步抬升逃逸
-      [6, 9, 12, 15, 18, 22, 26, 31, 36, 42, 49, 57, 66, 76, 86].forEach((elev, idx) => {
-        const spread = (idx - 7) * 0.022;
-        const opacity = 0.82 + Math.min(idx, 7) * 0.02;
+      // 紧凑绿色非陷获射线族：角度更密、扇面更窄，避免覆盖整片画面
+      [8, 10, 12, 14, 16, 18, 20, 23, 26, 30, 34, 38, 42].forEach((elev, idx) => {
+        const spread = (idx - 6) * 0.008;
+        const opacity = 0.6 + Math.min(idx, 6) * 0.018;
         const color = elev < 20 ? 0x00ff66 : elev < 45 ? 0x35f6b0 : 0x8dfdd1;
-        addEscapeCurve(elev, azim + spread, opacity, 0.046, color);
-      });
-
-      // 侧面方向 (展示3D)
-      [Math.PI * 0.15, Math.PI * 0.55].forEach(sideAz => {
-        angles.forEach(elev => {
-          const r = ductRayTracer.trace(origin, elev, sideAz);
-          if (r.points.length < 3 || r.trapped) return;
-          addEscapeCurve(elev, sideAz, 0.68, 0.034, 0x00ff66);
-        });
+        addEscapeCurve(elev, azim + spread, opacity, 0.028, color);
       });
     };
 
