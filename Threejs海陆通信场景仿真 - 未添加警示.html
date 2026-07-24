@@ -3049,8 +3049,8 @@
     createTree(-28, -28);
     createTree(-30, -14);
     createTree(-25, -8);
-    createTree(-12, -28);
-    createTree(-8, -30);
+    createTree(-36, 26);
+    createTree(-42, 34);
     createTree(-15, -10);
 
     // 海上浮标
@@ -3071,6 +3071,156 @@
     buoy2.position.set(42, 1, 28);
     buoy2.scale.setScalar(0.8);
     scene.add(buoy2);
+
+    // 低轨卫星：参考 img2threejs 风格，用组合几何表达箱体、太阳翼、抛物面天线与外露线束
+    const createLeoSatellite = () => {
+      const satellite = new THREE.Group();
+      satellite.name = 'img2threejs-style-leo-satellite';
+
+      const mat = {
+        body: new THREE.MeshStandardMaterial({ color: 0xd7dde3, roughness: 0.34, metalness: 0.62 }),
+        darkPanel: new THREE.MeshStandardMaterial({ color: 0x1a2a3d, roughness: 0.42, metalness: 0.35 }),
+        panel: new THREE.MeshStandardMaterial({ color: 0x123c74, roughness: 0.28, metalness: 0.5, emissive: 0x06244c, emissiveIntensity: 0.18 }),
+        gold: new THREE.MeshStandardMaterial({ color: 0xd8a838, roughness: 0.24, metalness: 0.58 }),
+        steel: new THREE.MeshStandardMaterial({ color: 0xb9c1c7, roughness: 0.22, metalness: 0.82 }),
+        cableBlue: new THREE.MeshStandardMaterial({ color: 0x0d7bdc, roughness: 0.35, metalness: 0.2 }),
+        cableGreen: new THREE.MeshStandardMaterial({ color: 0x5aa43a, roughness: 0.35, metalness: 0.2 }),
+        cableOrange: new THREE.MeshStandardMaterial({ color: 0xf4a12a, roughness: 0.35, metalness: 0.2 }),
+      };
+
+      const addBox = (size, position, material, rotation = [0, 0, 0]) => {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+        mesh.position.set(...position);
+        mesh.rotation.set(...rotation);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        satellite.add(mesh);
+        return mesh;
+      };
+
+      const addCylinder = (radiusTop, radiusBottom, height, position, material, rotation = [0, 0, 0], segments = 24) => {
+        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments), material);
+        mesh.position.set(...position);
+        mesh.rotation.set(...rotation);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        satellite.add(mesh);
+        return mesh;
+      };
+
+      const addLink = (from, to, radius, material) => {
+        const start = new THREE.Vector3(...from);
+        const end = new THREE.Vector3(...to);
+        const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+        const length = start.distanceTo(end);
+        const link = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, 10), material);
+        link.position.copy(mid);
+        link.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), end.clone().sub(start).normalize());
+        link.castShadow = true;
+        link.receiveShadow = true;
+        satellite.add(link);
+        return link;
+      };
+
+      addBox([3.0, 3.8, 2.3], [0, 0, 0], mat.body);
+      addBox([3.35, 0.16, 2.55], [0, 2.05, 0], mat.steel);
+      addCylinder(1.3, 1.3, 0.42, [0, -2.1, 0], mat.steel, [Math.PI / 2, 0, 0], 48);
+
+      const equipmentPositions = [
+        [-1.65, 0.95, 0.15], [-1.65, 0.1, -0.45], [-1.65, -0.8, 0.45],
+        [1.65, 0.7, -0.35], [1.65, -0.35, 0.5], [0, 0.2, 1.28],
+      ];
+      equipmentPositions.forEach((pos, index) => {
+        const size = index === 5 ? [1.55, 1.05, 0.18] : [0.58, 0.72, 0.2];
+        const rotation = index < 3 ? [0, 0, Math.PI / 2] : index < 5 ? [0, 0, Math.PI / 2] : [0, 0, 0];
+        addBox(size, pos, index === 5 ? mat.darkPanel : mat.body, rotation);
+      });
+
+      const dish = new THREE.Mesh(
+        new THREE.SphereGeometry(1.28, 48, 18, 0, Math.PI * 2, 0, Math.PI / 2),
+        new THREE.MeshStandardMaterial({
+          color: 0xe7ebef,
+          roughness: 0.18,
+          metalness: 0.72,
+          side: THREE.DoubleSide,
+        })
+      );
+      dish.position.set(-0.65, 2.92, 0.08);
+      dish.rotation.set(-0.88, 0.3, -0.18);
+      dish.scale.set(1.18, 1.18, 0.32);
+      dish.castShadow = true;
+      satellite.add(dish);
+      addCylinder(0.09, 0.09, 1.0, [-0.3, 2.45, 0.02], mat.steel, [0.7, 0, 0.25]);
+      addCylinder(0.18, 0.18, 1.0, [0.75, 2.75, 0.15], mat.steel);
+      addCylinder(0.38, 0.38, 0.58, [0.75, 3.55, 0.15], mat.body, [0, 0, 0], 32);
+
+      const buildSolarArray = (side) => {
+        const x = side * 4.9;
+        addLink([side * 1.5, 0.52, 0], [side * 3.15, 0.52, 0], 0.055, mat.steel);
+        addLink([side * 1.5, -0.52, 0], [side * 3.15, -0.52, 0], 0.055, mat.steel);
+        addLink([side * 2.0, -0.9, 0], [side * 3.4, 0.9, 0], 0.035, mat.steel);
+        addLink([side * 2.0, 0.9, 0], [side * 3.4, -0.9, 0], 0.035, mat.steel);
+
+        const panelGroup = new THREE.Group();
+        panelGroup.name = side < 0 ? 'left-solar-panel-array' : 'right-solar-panel-array';
+        panelGroup.position.set(x, 0, 0);
+        panelGroup.rotation.z = side < 0 ? 0.14 : -0.14;
+        satellite.add(panelGroup);
+
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(3.2, 5.0, 0.12), mat.gold);
+        frame.castShadow = true;
+        frame.receiveShadow = true;
+        panelGroup.add(frame);
+
+        for (let ix = -1; ix <= 1; ix++) {
+          for (let iy = -2; iy <= 2; iy++) {
+            const cell = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.78, 0.16), mat.panel);
+            cell.position.set(ix * 0.98, iy * 0.86, 0.04);
+            cell.castShadow = true;
+            panelGroup.add(cell);
+          }
+        }
+
+        for (let i = -1; i <= 1; i++) {
+          const rib = new THREE.Mesh(new THREE.BoxGeometry(0.035, 5.18, 0.2), mat.gold);
+          rib.position.x = i * 1.05;
+          panelGroup.add(rib);
+        }
+        for (let i = -2; i <= 2; i++) {
+          const rib = new THREE.Mesh(new THREE.BoxGeometry(3.36, 0.035, 0.2), mat.gold);
+          rib.position.y = i * 0.9;
+          panelGroup.add(rib);
+        }
+      };
+
+      buildSolarArray(-1);
+      buildSolarArray(1);
+
+      [-0.75, 0, 0.75].forEach((x, index) => {
+        const cableMat = [mat.cableBlue, mat.cableGreen, mat.cableOrange][index];
+        addCylinder(0.045, 0.045, 3.3, [x, 0.05, 1.34], cableMat);
+        addCylinder(0.045, 0.045, 1.45, [x + 0.36, 1.45, 1.34], cableMat, [0, 0, Math.PI / 2]);
+      });
+
+      [[-1.25, 1.72, -0.65], [1.25, 1.72, -0.65], [-1.25, -1.72, -0.65], [1.25, -1.72, -0.65]].forEach(pos => {
+        addCylinder(0.12, 0.12, 0.42, pos, mat.steel, [Math.PI / 2, 0, 0], 20);
+      });
+
+      const labelDiv = document.createElement('div');
+      labelDiv.className = 'label';
+      labelDiv.innerHTML = '🛰️ 低轨卫星';
+      const label = new CSS2DObject(labelDiv);
+      label.position.set(0, 4.45, 0);
+      satellite.add(label);
+
+      satellite.position.set(18, 38, -34);
+      satellite.rotation.set(-0.22, 0.62, 0.12);
+      satellite.scale.setScalar(1.35);
+      return satellite;
+    };
+
+    const leoSatellite = createLeoSatellite();
+    scene.add(leoSatellite);
 
     // 海鸥 (简化抽象)
     const createSeagull = (x, y, z) => {
@@ -3193,6 +3343,10 @@
       // 浮标随浪浮动
       buoy.position.y = 1 + sampleWaveHeight(35 - 5, 15 - 5);
       buoy2.position.y = 1 + sampleWaveHeight(42 - 5, 28 - 5);
+
+      // 低轨卫星缓慢姿态变化，保持可识别的太阳翼和载荷舱轮廓
+      leoSatellite.rotation.y = 0.62 + Math.sin(elapsed * 0.16) * 0.05;
+      leoSatellite.rotation.z = 0.12 + Math.sin(elapsed * 0.11) * 0.025;
 
       // 更新通信链路 (每0.5秒)
       if (Math.floor(elapsed * 2) !== Math.floor((elapsed - dt) * 2)) {
