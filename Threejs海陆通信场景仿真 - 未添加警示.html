@@ -1,0 +1,3524 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Three.js 海陆通信场景 - 基站 & 海上接收机</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #000; font-family: 'Microsoft YaHei', sans-serif; }
+    canvas { display: block; }
+
+    #info-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      padding: 18px 22px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      pointer-events: none;
+      backdrop-filter: blur(10px);
+      min-width: 280px;
+    }
+    #info-panel h2 {
+      font-size: 18px;
+      margin: 0 0 10px 0;
+      color: #4fc3f7;
+    }
+    #info-panel .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #78909c;
+      margin: 10px 0 4px 0;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding-top: 8px;
+    }
+    #info-panel p {
+      font-size: 13px;
+      margin: 3px 0;
+      color: #b0bec5;
+    }
+    #info-panel .metric-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #info-panel .metric-label {
+      color: #90a4ae;
+    }
+    #info-panel .metric-value {
+      color: #fff;
+      font-weight: bold;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 14px;
+    }
+    #info-panel .metric-value.good { color: #4caf50; }
+    #info-panel .metric-value.warn { color: #ff9800; }
+    #info-panel .metric-value.bad  { color: #f44336; }
+
+    /* 信号强度条形图 */
+    #signal-bar-container {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      margin-top: 4px;
+      overflow: hidden;
+    }
+    #signal-bar {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s, background 0.3s;
+    }
+
+    #controls-hint {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.6);
+      color: #90a4ae;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      pointer-events: none;
+      backdrop-filter: blur(10px);
+    }
+
+    /* 右侧基站参数面板 */
+    #bs-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      padding: 16px 18px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      pointer-events: none;
+      backdrop-filter: blur(10px);
+      font-size: 12px;
+      max-width: 220px;
+    }
+    #bs-panel h3 {
+      font-size: 14px;
+      color: #ffb74d;
+      margin: 0 0 8px 0;
+    }
+    #bs-panel .param-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 2px 0;
+    }
+    #bs-panel .param-label { color: #90a4ae; }
+    #bs-panel .param-value { color: #e0e0e0; font-family: 'Consolas', monospace; }
+
+    /* 状态指示器 */
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+    .status-dot.active { background: #4caf50; box-shadow: 0 0 8px #4caf50; animation: pulse 1.5s ease-in-out infinite; }
+    .status-dot.low   { background: #ff9800; box-shadow: 0 0 8px #ff9800; animation: pulse 0.6s ease-in-out infinite; }
+    .status-dot.lost  { background: #f44336; box-shadow: 0 0 6px #f44336; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* 蒸发波导面板 */
+    #duct-panel {
+      position: absolute;
+      bottom: 80px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 152, 0, 0.3);
+      pointer-events: none;
+      backdrop-filter: blur(10px);
+      font-size: 12px;
+      max-width: 200px;
+    }
+    #duct-panel h3 {
+      font-size: 13px;
+      color: #ff9800;
+      margin: 0 0 6px 0;
+    }
+    #duct-panel .duct-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 2px 0;
+    }
+    #duct-panel .duct-label { color: #a0a0a0; }
+    #duct-panel .duct-value { color: #ffcc80; font-family: 'Consolas', monospace; }
+
+    /* 环境参数面板 */
+    #env-panel {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      padding: 12px 15px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      pointer-events: none;
+      backdrop-filter: blur(10px);
+      font-size: 11px;
+      max-width: 200px;
+    }
+    #env-panel h3 {
+      font-size: 12px;
+      color: #81d4fa;
+      margin: 0 0 4px 0;
+    }
+    #env-panel .env-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 1px 0;
+    }
+    #env-panel .env-label { color: #90a4ae; }
+    #env-panel .env-value { color: #e0e0e0; font-family: 'Consolas', monospace; }
+
+    /* 信道分析面板 */
+    #analysis-panel {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.78);
+      color: #fff;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      pointer-events: none;
+      backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #analysis-panel h3 {
+      font-size: 12px;
+      color: #81d4fa;
+      margin: 0;
+    }
+    #analysis-panel canvas {
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    #export-hint {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.6);
+      color: #90a4ae;
+      padding: 6px 12px;
+      border-radius: 16px;
+      font-size: 11px;
+      pointer-events: none;
+      backdrop-filter: blur(10px);
+    }
+  </style>
+</head>
+<body>
+  <!-- 信号实时数据面板 -->
+  <div id="info-panel">
+    <h2>📡 实时信号监测</h2>
+    <p><span class="status-dot active" id="link-status-dot"></span>
+       <span id="link-status-text">链路正常</span></p>
+
+    <div class="section-title">📶 接收信号</div>
+    <div class="metric-row">
+      <span class="metric-label">RSRP</span>
+      <span class="metric-value good" id="rsrp-value">-65 dBm</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">SINR</span>
+      <span class="metric-value good" id="sinr-value">28.5 dB</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">RSRQ</span>
+      <span class="metric-value good" id="rsrq-value">-8.2 dB</span>
+    </div>
+    <div id="signal-bar-container">
+      <div id="signal-bar" style="width:85%;background:#4caf50;"></div>
+    </div>
+
+    <div class="section-title">📊 链路参数</div>
+    <div class="metric-row">
+      <span class="metric-label">路径损耗</span>
+      <span class="metric-value" id="pathloss-value">102 dB</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">距离</span>
+      <span class="metric-value" id="distance-value">85 m</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">海浪高度</span>
+      <span class="metric-value" id="wave-height-value">1.2 m</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">传播模型</span>
+      <span class="metric-value" id="model-value" style="font-size:11px;">双线地面反射</span>
+    </div>
+  </div>
+
+  <!-- 基站工程参数面板 -->
+  <div id="bs-panel">
+    <h3>🗼 基站工程参数</h3>
+    <div class="param-row"><span class="param-label">发射功率</span><span class="param-value">43 dBm (20W)</span></div>
+    <div class="param-row"><span class="param-label">频率</span><span class="param-value">2600 MHz</span></div>
+    <div class="param-row"><span class="param-label">带宽</span><span class="param-value">20 MHz</span></div>
+    <div class="param-row"><span class="param-label">Tx 天线增益</span><span class="param-value">17 dBi</span></div>
+    <div class="param-row"><span class="param-label">Tx 天线高度</span><span class="param-value">25 m</span></div>
+    <div class="param-row"><span class="param-label">天线类型</span><span class="param-value">定向板状</span></div>
+    <div class="param-row"><span class="param-label">波束宽度</span><span class="param-value">65° H / 8° V</span></div>
+    <div class="param-row"><span class="param-label">馈线损耗</span><span class="param-value">3 dB</span></div>
+    <div style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;">
+      <div class="param-row"><span class="param-label">Rx 天线增益</span><span class="param-value">10 dBi</span></div>
+      <div class="param-row"><span class="param-label">Rx 天线高度</span><span class="param-value">3 m</span></div>
+      <div class="param-row"><span class="param-label">Rx 噪声系数</span><span class="param-value">5 dB</span></div>
+    </div>
+  </div>
+
+  <div id="controls-hint">
+    🖱 鼠标拖拽旋转视角 | 滚轮缩放 | 右键平移 | ⌨ WASD 移动船只
+  </div>
+
+  <!-- 信道分析面板 -->
+  <div id="analysis-panel">
+    <h3>📊 信道建模数据 — M剖面 & 路径损耗</h3>
+    <canvas id="mprofile-canvas" width="360" height="140"></canvas>
+    <canvas id="pathloss-canvas" width="360" height="160"></canvas>
+    <div style="font-size:10px;color:#78909c;margin-top:2px;">
+      时延: <span id="delay-value" style="color:#ffcc80;">--</span> |
+      均匀/非均匀: <span id="homog-status" style="color:#81d4fa;">均匀</span>
+    </div>
+  </div>
+
+  <div id="export-hint" style="display:none;">
+    📥 数据已导出到控制台 — 使用 copy() 复制
+  </div>
+
+  <!-- 蒸发波导面板 -->
+  <div id="duct-panel">
+    <h3>🌫 蒸发波导状态</h3>
+    <div class="duct-row"><span class="duct-label">波导高度</span><span class="duct-value" id="duct-height">-- m</span></div>
+    <div class="duct-row"><span class="duct-label">波导强度</span><span class="duct-value" id="duct-strength">--</span></div>
+    <div class="duct-row"><span class="duct-label">陷获增益</span><span class="duct-value" id="duct-gain">0 dB</span></div>
+    <div class="duct-row"><span class="duct-label">临界频率</span><span class="duct-value" id="duct-freq">-- MHz</span></div>
+    <div class="duct-row"><span class="duct-label">陷获状态</span><span class="duct-value" id="duct-trapping">--</span></div>
+  </div>
+
+  <!-- 环境参数面板 -->
+  <div id="env-panel">
+    <h3>🌡 海洋气象环境</h3>
+    <div class="env-row"><span class="env-label">气温 (T_air)</span><span class="env-value" id="env-tair">28 °C</span></div>
+    <div class="env-row"><span class="env-label">海温 (T_sea)</span><span class="env-value" id="env-tsea">25 °C</span></div>
+    <div class="env-row"><span class="env-label">相对湿度 (RH)</span><span class="env-value" id="env-rh">75 %</span></div>
+    <div class="env-row"><span class="env-label">风速 (U)</span><span class="env-value" id="env-wind">6 m/s</span></div>
+    <div class="env-row"><span class="env-label">大气压 (P)</span><span class="env-value" id="env-pres">1013 hPa</span></div>
+    <div class="env-row"><span class="env-label">ASTD</span><span class="env-value" id="env-astd">-3.0 °C</span></div>
+  </div>
+
+  <!-- Three.js Import Map -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+    // ============================================
+    // 0. 基站工程定义 & 信号传播模型
+    // ============================================
+
+    /**
+     * ============================================================
+     * 蒸发波导物理模型 (Evaporation Duct Model)
+     * ============================================================
+     *
+     * 【物理机制】
+     * 海洋表面蒸发导致近海面大气中水汽含量随高度急剧递减，
+     * 形成大气折射率的垂直梯度。当折射率梯度满足 dM/dz < 0 时，
+     * 无线电波被"陷获"在海面附近的一个薄层内反复折射传播，
+     * 这个薄层就是蒸发波导 (Evaporation Duct)。
+     *
+     * 【修正折射率】
+     * M(z) = N(z) + (z / R_e) * 10^6
+     * 其中 N(z) = 77.6/T * (P + 4810*e/T)   (ITU-R P.453)
+     *       R_e = 6371 km (地球半径)
+     *
+     * 【陷获条件】
+     * dM/dz < 0  →  电磁波被波导陷获，可超视距传播
+     * 波导高度 δ 定义为 M(δ) = M(0) 的第二个解 (dM/dz=0 处)
+     *
+     * 【关键方程 — 近海面折射率廓线 (对数-线性模型)】
+     * 蒸发波导中水汽压廓线:
+     *   e(z) = e_0 + (e_ref - e_0) * ln(1 + z/z_q) / ln(1 + z_ref/z_q)
+     * 温度廓线:
+     *   T(z) = T_0 + (T_ref - T_0) * ln(1 + z/z_t) / ln(1 + z_ref/z_t)
+     *
+     * 【Paulus-Jeske 波导高度计算】
+     * 基于 Monin-Obukhov 相似理论和 bulk 空气动力学方法:
+     *   1. 计算海表饱和水汽压 e_s(T_sea)
+     *   2. 计算特征尺度 θ*, q*, u* (迭代求解)
+     *   3. 计算稳定度修正函数 ψ(ζ)
+     *   4. 求解 dM/dz = 0 得到波导高度 δ
+     *
+     * 【陷获增益】
+     * 当发射和接收天线都在波导内 + 频率 < 临界频率 → 信号增强
+     * 临界频率: f_c ≈ 100 / δ^(3/2)  (GHz)
+     */
+    class EvaporationDuctModel {
+      constructor() {
+        // ===== 环境参数 (可动态变化) — 默认强波导条件 =====
+        this.airTemp   = 26.5;    // 气温 T_air (°C), 10m 高度
+        this.seaTemp   = 28.0;    // 海表水温 T_sea (°C) → ASTD=-1.5°C
+        this.rh        = 75.0;    // 相对湿度 RH (%)
+        this.windSpeed = 5.0;     // 风速 U (m/s), 10m 高度
+        this.pressure  = 1013.25; // 大气压 P (hPa)
+        this.refHeight = 10.0;    // 气象参数参考测量高度 (m)
+
+        // ===== 物理常数 =====
+        this.R_EARTH = 6371e3;      // 地球半径 (m)
+        this.KAPPA   = 0.40;        // von Kármán 常数
+        this.GRAVITY = 9.81;        // 重力加速度 (m/s²)
+        this.C_P     = 1004.67;     // 空气定压比热 (J/kg·K)
+        this.L_V     = 2.5e6;       // 水的汽化潜热 (J/kg)
+
+        // ===== 表面粗糙度 (m) =====
+        this.z_0m = 1.5e-4;  // 动量粗糙度长度 (海面)
+        this.z_0t = 1.5e-4;  // 温度粗糙度长度
+        this.z_0q = 1.5e-4;  // 湿度粗糙度长度
+
+        // ===== 计算结果 =====
+        this.ductHeight = 0;      // 波导高度 δ (m)
+        this.ductStrength = 0;    // 波导强度 ΔM (M-units)
+        this.trappingGain = 0;    // 陷获增益 (dB)
+        this.criticalFreq = 0;    // 临界频率 (MHz)
+        this.isTrapping = false;  // 是否满足陷获条件
+        this.astd = -3.0;         // air-sea temperature difference
+
+        // ===== 缓存: 通量尺度 (避免射线追踪时重复迭代) =====
+        this._cachedFlux = null;
+        this._cacheDirty = true;
+
+        // 初始计算
+        this.updateDuct();
+      }
+
+      /**
+       * 设置环境参数并重新计算波导
+       */
+      setEnvironment({ airTemp, seaTemp, rh, windSpeed, pressure }) {
+        if (airTemp   !== undefined) this.airTemp   = airTemp;
+        if (seaTemp   !== undefined) this.seaTemp   = seaTemp;
+        if (rh        !== undefined) this.rh        = rh;
+        if (windSpeed !== undefined) this.windSpeed = windSpeed;
+        if (pressure  !== undefined) this.pressure  = pressure;
+        this._cacheDirty = true;
+        this.updateDuct();
+      }
+
+      /** 获取缓存的通量尺度 */
+      getFluxScales() {
+        if (this._cacheDirty || !this._cachedFlux) {
+          this._cachedFlux = this.computeFluxScales();
+          this._cacheDirty = false;
+        }
+        return this._cachedFlux;
+      }
+
+      /**
+       * 饱和水汽压 (hPa) — Magnus-Tetens 公式
+       * 这是水文学/气象学标准公式, 用于计算给定温度下空气能容纳的最大水汽
+       */
+      saturationVaporPressure(tempC) {
+        // Magnus formula: e_s = 6.112 * exp(17.67 * T / (T + 243.5))  [hPa]
+        return 6.112 * Math.exp((17.67 * tempC) / (tempC + 243.5));
+      }
+
+      /**
+       * 实际水汽压 (hPa)
+       * e = e_s(T) * RH / 100
+       */
+      actualVaporPressure(tempC, rh) {
+        return this.saturationVaporPressure(tempC) * rh / 100.0;
+      }
+
+      /**
+       * 大气折射率 N — ITU-R P.453-14 标准公式
+       *
+       * N = 77.6/T * (P + 4810*e/T)
+       *
+       * 其中: T = 温度 (K), P = 大气压 (hPa), e = 水汽压 (hPa)
+       * 第一项 77.6*P/T 是干空气贡献 (与密度成正比)
+       * 第二项 373256*e/T² 是湿空气贡献 (水汽的偶极子效应, 主导了近海面变化)
+       */
+      refractivity(tempC, pressure, rh) {
+        const T = tempC + 273.15;  // K
+        const e = this.actualVaporPressure(tempC, rh);
+        return (77.6 / T) * (pressure + (4810.0 * e) / T);
+      }
+
+      /**
+       * 修正折射率 M — 地球曲率修正后的折射率
+       *
+       * M(z) = N(z) + (z / R_EARTH) * 10^6
+       *
+       * M 的梯度决定传播条件:
+       *   dM/dz > 117 M-units/km  → 次折射 (sub-refraction)
+       *   79 < dM/dz < 117         → 正常折射
+       *   0 < dM/dz < 79           → 超折射 (super-refraction)
+       *   dM/dz < 0                → 陷获 (trapping) ← 蒸发波导!
+       *
+       * 大气层的标准梯度是 dN/dz ≈ -40 N-units/km
+       * 加上地球曲率项 157 N-units/km → dM/dz ≈ 117 M-units/km (标准大气)
+       */
+      modifiedRefractivity(z, surfaceN, tempC, pressure, rh) {
+        const T = tempC + 273.15;
+        const e = this.actualVaporPressure(tempC, rh);
+        const N = (77.6 / T) * (pressure + (4810.0 * e) / T);
+        return N + (z / this.R_EARTH) * 1e6;
+      }
+
+      /**
+       * Monin-Obukhov 长度 L — 大气稳定度参数
+       *
+       * 物理意义: 机械湍流产生率 = 浮力产生/消耗率 的高度
+       * L > 0: 稳定层结 (T_air > T_sea, 不利于波导)
+       * L < 0: 不稳定层结 (T_air < T_sea, 有利于波导形成)
+       * |L| → ∞: 中性层结 (纯机械湍流)
+       *
+       * 计算使用 bulk Richardson 数方法:
+       *   Ri_B = (g / T_v0) * (Δθ_v * z_ref) / U²
+       *   L = z_ref * f(Ri_B)
+       */
+      computeMoninObukhovLength(uStar, tStar, qStar, thetaV0) {
+        // θ_v* = θ* + 0.61 * T₀ * q*  (虚位温特征尺度)
+        const thetaVStar = tStar + 0.61 * (this.airTemp + 273.15) * qStar;
+
+        // L = u*² · θ_v0 / (κ · g · θ_v*)
+        // θ_v* < 0 (unstable) → L < 0 → 利于波导
+        const denom = this.KAPPA * this.GRAVITY * thetaVStar;
+        if (Math.abs(denom) < 1e-12) return 1e10; // neutral
+        return (uStar * uStar * thetaV0) / denom;
+      }
+
+      /**
+       * 稳定度修正函数 ψ — 修正对数风/温廓线
+       *
+       * Businger-Dyer 关系式 (最广泛使用的经验公式):
+       *
+       * 不稳定 (ζ < 0):
+       *   ψ_m = 2*ln((1+x)/2) + ln((1+x²)/2) - 2*arctan(x) + π/2
+       *   ψ_h = 2*ln((1+x²)/2)
+       *   其中 x = (1 - 16ζ)^(1/4)
+       *
+       * 稳定 (ζ > 0):
+       *   ψ_m = ψ_h = -5ζ   (线性关系)
+       */
+      stabilityFunctionM(zeta) {
+        if (zeta < 0) {
+          const x = Math.pow(1.0 - 16.0 * zeta, 0.25);
+          return 2.0 * Math.log((1.0 + x) / 2.0)
+               + Math.log((1.0 + x * x) / 2.0)
+               - 2.0 * Math.atan(x)
+               + Math.PI / 2.0;
+        } else {
+          return -5.0 * zeta;
+        }
+      }
+
+      stabilityFunctionH(zeta) {
+        if (zeta < 0) {
+          const x = Math.pow(1.0 - 16.0 * zeta, 0.25);
+          return 2.0 * Math.log((1.0 + x * x) / 2.0);
+        } else {
+          return -5.0 * zeta;
+        }
+      }
+
+      /**
+       * 迭代求解特征尺度 u*, θ*, q* — COARE bulk 通量算法的核心
+       *
+       * 这是一个非线性方程组, 用迭代法求解:
+       *
+       * 对数风廓线: u* = κ * U / [ln(z/z_0m) - ψ_m(ζ)]
+       * 对数温廓线: θ* = κ * Δθ / [ln(z/z_0t) - ψ_h(ζ)]
+       * 对数湿廓线: q* = κ * Δq / [ln(z/z_0q) - ψ_h(ζ)]
+       *
+       * 其中 ζ = z/L 是稳定度参数
+       * 每次迭代更新 u*,θ*,q* → 计算 L → 计算 ζ → 计算 ψ → 更新 u*,θ*,q*
+       * 通常 5-10 次迭代收敛
+       */
+      computeFluxScales() {
+        const z = this.refHeight;
+        const T0 = this.seaTemp + 273.15;  // 海表温度 (K)
+        const T_ref = this.airTemp + 273.15; // 参考高度温度 (K)
+
+        // 位温 (potential temperature)
+        const theta_s = this.seaTemp + 0.0098 * 0;   // 海表 (z=0)
+        const theta_ref = this.airTemp + 0.0098 * z;  // 参考高度
+
+        // 比湿 (specific humidity) — 近似
+        const e_sea = this.saturationVaporPressure(this.seaTemp); // 海表饱和
+        const e_air = this.actualVaporPressure(this.airTemp, this.rh);
+        const q_sea = 0.622 * e_sea / (this.pressure - 0.378 * e_sea);  // kg/kg
+        const q_air = 0.622 * e_air / (this.pressure - 0.378 * e_air);
+
+        // 虚位温
+        const thetaV_s = theta_s * (1.0 + 0.61 * q_sea);
+        const thetaV_ref = theta_ref * (1.0 + 0.61 * q_air);
+        const thetaV0 = thetaV_s;
+
+        // 初始猜测 (中性条件, ψ=0)
+        let uStar = this.KAPPA * this.windSpeed / Math.log(z / this.z_0m);
+        let tStar = this.KAPPA * (theta_ref - theta_s) / Math.log(z / this.z_0t);
+        let qStar = this.KAPPA * (q_air - q_sea) / Math.log(z / this.z_0q);
+
+        // Picard 迭代
+        const MAX_ITER = 15;
+        for (let iter = 0; iter < MAX_ITER; iter++) {
+          const L = this.computeMoninObukhovLength(uStar, tStar, qStar, thetaV0);
+          const zeta = z / L;
+
+          const psiM = this.stabilityFunctionM(zeta);
+          const psiH = this.stabilityFunctionH(zeta);
+
+          const uStarNew = this.KAPPA * this.windSpeed / (Math.log(z / this.z_0m) - psiM);
+          const tStarNew = this.KAPPA * (theta_ref - theta_s) / (Math.log(z / this.z_0t) - psiH);
+          const qStarNew = this.KAPPA * (q_air - q_sea) / (Math.log(z / this.z_0q) - psiH);
+
+          // 收敛检查
+          const du = Math.abs(uStarNew - uStar);
+          const dt = Math.abs(tStarNew - tStar);
+          const dq = Math.abs(qStarNew - qStar);
+
+          uStar = uStarNew;
+          tStar = tStarNew;
+          qStar = qStarNew;
+
+          if (du < 1e-5 && dt < 1e-5 && dq < 1e-5) break;
+        }
+
+        return { uStar, tStar, qStar, thetaV0 };
+      }
+
+      /**
+       * 计算蒸发波导高度 δ
+       *
+       * 核心方法: 在修正折射率廓线中找到 dM/dz = 0 的点
+       *
+       * 近海面修正折射率廓线 (对数-线性模型):
+       *   M(z) = M_0 + c_0 * [ z - δ * ln((z + z_w) / z_w) ]
+       *
+       * 其中: c_0 = 0.125 M-units/m (标准大气折射率梯度)
+       *       z_w = 水汽粗糙度长度 (≈1.5×10⁻⁴ m)
+       *       δ = 波导高度
+       *
+       * dM/dz = c_0 * [ 1 - δ/(z + z_w) ]
+       * dM/dz = 0  →  z = δ - z_w  ≈ δ  (z_w 很小)
+       *
+       * 实际上 δ 由特征尺度和环境参数决定:
+       *   δ ∝ |q*| / (稳定度因子)
+       *
+       * 使用改进的 Paulus (1989) 公式:
+       *   δ = -(q* / (κ * u*)) * (T²_ref / (4810 * e_ref * g))
+       *        * f(稳定度修正)
+       */
+      computeDuctHeight() {
+        const { uStar, tStar, qStar, thetaV0 } = this.computeFluxScales();
+
+        // ASTD
+        this.astd = this.airTemp - this.seaTemp;
+
+        // 实际水汽压和折射率
+        const e_air = this.actualVaporPressure(this.airTemp, this.rh);
+        const T_ref_K = this.airTemp + 273.15;
+
+        // ---- 波导高度 δ 的物理计算 ----
+        // 蒸发波导主要由近海面水汽的急剧递减造成
+        // 湿度对折射率的贡献: N_wet = 77.6 * 4810 * e / T²
+        //
+        // 水汽廓线: q(z) ≈ q_0 + q* * ln(z/z_0q) / κ  (近海面对数层)
+        // 折射率廓线: N(z) ∝ e(z)/T²
+        //
+        // 设 dM/dz = 0 求解 z:
+        //   dN/dz + 1e6/R_e = 0
+        //   (dN/de) * (de/dq) * (dq/dz) + 0.157 = 0
+        //
+        // dN/de ≈ 77.6 * 4810 / T²  (每单位水汽压的 N 变化)
+        // de/dq ≈ P / 0.622  (比湿转水汽压)
+        // dq/dz ≈ q* / (κ * z)  (对数廓线梯度, 近中性时)
+        //
+        // 解得: δ ≈ (4810 * 77.6 * P * |q*|) / (T² * 0.622 * κ * 1e6/R_e)
+        //        = (4810 * 77.6 * P * |q*| * R_e) / (T² * 0.622 * κ * 1e6)
+
+        const dNde = 77.6 * 4810.0 / (T_ref_K * T_ref_K);
+        const dedq = this.pressure / 0.622;
+        // qGradient = dq/dz = q*/(κ·z₀q) — 必须用带符号的 qStar!
+        // q*<0 (空气比海面干) → dq/dz<0 → dN/dz<0 → 陷获
+        const qGradient = qStar / (this.KAPPA * this.z_0q);
+
+        // dN/dz at surface = dN/de * de/dq * dq/dz
+        const dNdz_surface = dNde * dedq * qGradient;
+
+        // 地球曲率项: curvature = 1e6/R_e ≈ 156.9 N-units/km ≈ 0.157 M-units/m
+        const curvatureGrad = 1e6 / this.R_EARTH;
+
+        // 陷获条件: dN/dz < -curvatureGrad (即 dM/dz < 0)
+        if (dNdz_surface < -curvatureGrad) {
+          // 波导存在! δ 是 dM/dz 从负变正的高度
+          //
+          // 用对数廓线近似: dN/dz(z) = -A/z (A 为常数, 由地表梯度决定)
+          // dM/dz(z) = -A/z + curvatureGrad = 0
+          // → z = A / curvatureGrad = |dN/dz_surface| * z_0q / curvatureGrad
+          //
+          // 更精确: 使用水汽梯度尺度
+          // δ ≈ |q*| * dNde * dedq / (κ * curvatureGrad)
+          this.ductHeight = Math.abs(qStar) * dNde * dedq
+                          / (this.KAPPA * curvatureGrad);
+        } else {
+          this.ductHeight = 0;  // 无波导
+        }
+
+        // 物理约束: 波导高度限制
+        this.ductHeight = Math.max(0, Math.min(35, this.ductHeight));
+
+        // 波导强度 ΔM = M(0) - M(δ)  (陷获强度)
+        if (this.ductHeight > 0.01) {
+          const M0 = this.modifiedRefractivity(0, 0, this.seaTemp, this.pressure, 100);
+          const Mdelta = this.modifiedRefractivity(this.ductHeight, 0,
+            this.airTemp, this.pressure, this.rh);
+          this.ductStrength = Math.abs(M0 - Mdelta);
+        } else {
+          this.ductStrength = 0;
+        }
+
+        // 临界频率 f_c — 低于此频率的信号才能被波导有效陷获
+        // 经验公式: f_c (GHz) ≈ 100 / δ^(3/2) (δ in meters)
+        // 转换为 MHz
+        if (this.ductHeight > 0.01) {
+          this.criticalFreq = (100.0 / Math.pow(this.ductHeight, 1.5)) * 1000; // MHz
+        } else {
+          this.criticalFreq = Infinity;
+        }
+
+        this.isTrapping = this.ductHeight > 0.01;
+      }
+
+      /**
+       * 计算波导陷获增益 — 这是蒸发波导对通信的核心影响
+       *
+       * 物理机制:
+       *   当 Tx 和 Rx 都在波导高度内时, 电磁波无法逃逸到高空,
+       *   被限制在波导层内传播, 路径损耗显著低于标准大气条件。
+       *
+       * 增益计算基于:
+       *   1. 频率相对于临界频率的比值 (f/f_c)
+       *   2. 天线是否在波导内
+       *   3. 波导强度 ΔM
+       *   4. 距离 (波导传播的路径损耗衰减更慢)
+       *
+       * 经验模型 (基于海上实测数据):
+       *   增益 ≈ 10 * log10(1 + α * ΔM * (1 - f/f_c) * h_duct_factor)
+       *   其中 α ≈ 0.3-0.5
+       *
+       * 当 f > f_c 时: 部分陷获 → 增益衰减
+       * 当 f << f_c 时: 全陷获 → 最大增益
+       */
+      computeTrappingGain(txHeight, rxHeight, frequency) {
+        if (!this.isTrapping || this.ductHeight < 0.01) return 0;
+
+        // 天线在波导内的比例
+        const txInDuct = Math.max(0, 1.0 - txHeight / Math.max(this.ductHeight, 0.01));
+        const rxInDuct = Math.max(0, 1.0 - rxHeight / Math.max(this.ductHeight, 0.01));
+        const heightFactor = Math.min(txInDuct, rxInDuct);
+        // 两个天线都在波导外 → 无增益
+        if (heightFactor <= 0) return 0;
+
+        // 频率陷获因子
+        const fMHz = frequency;
+        let freqFactor;
+        if (fMHz <= this.criticalFreq) {
+          // 完全陷获
+          freqFactor = 1.0;
+        } else if (fMHz <= this.criticalFreq * 2) {
+          // 部分陷获, 线性过渡
+          freqFactor = 1.0 - 0.5 * (fMHz - this.criticalFreq) / this.criticalFreq;
+        } else {
+          // 频率太高, 波导无法陷获
+          freqFactor = 0.3;
+        }
+
+        // 增益计算
+        // 波导强度每增加 1 M-unit, 增益约 2-3 dB
+        // 乘以高度因子和频率因子
+        const gainDB = this.ductStrength * 2.5 * heightFactor * freqFactor;
+
+        return Math.max(0, gainDB);
+      }
+
+      /**
+       * 更新波导状态
+       */
+      updateDuct() {
+        this.computeDuctHeight();
+        if (!this.isTrapping) {
+          this.trappingGain = 0;
+        }
+      }
+
+      /**
+       * 计算修正折射率梯度 dM/dz 在高度 z 处的值
+       *
+       * 使用蒸发波导标准对数-线性剖面模型:
+       *
+       *   dM/dz(z) = c₀ * [1 - δ / max(z, z_min)]
+       *
+       * 其中: c₀ = 0.125 M-units/m (标准折射梯度)
+       *       δ  = 波导高度
+       *
+       * 波导内 (z < δ): dM/dz < 0 → 陷获条件
+       * 波导外 (z > δ): dM/dz > 0 → 正常传播
+       *
+       * 这个简化模型是射线追踪的标准做法 (Paulus 1989, ITU-R P.834)
+       *
+       * @param {number} z - 高度 (m)
+       * @returns {number} dM/dz (M-units/m), 负值=陷获, 正值=正常
+       */
+      dMdz(z) {
+        if (!this.isTrapping || this.ductHeight < 0.01) {
+          // 无波导: 标准大气 — dM/dz ≈ +0.117 M-units/m
+          return 0.117;
+        }
+
+        const zSafe = Math.max(0.01, z);
+        const delta = this.ductHeight;
+
+        // 对数-线性廓线梯度:
+        // dM/dz = c₀ * [1 - δ/z]  (z >> z_w 时)
+        //
+        // 物理含义:
+        //   z < δ → dM/dz < 0 → 射线向下弯曲 (陷获)
+        //   z = δ → dM/dz = 0 (波导顶, 射线水平)
+        //   z > δ → dM/dz > 0 → 射线向上弯曲 (逃逸)
+        const c0 = 0.125; // M-units/m, 标准大气折射率梯度
+
+        // 在波导内: 梯度随高度线性变化
+        // 海面处: dM/dz ≈ -0.3 ~ -1.0 M-units/m (取决于波导强度)
+        // 波导顶: dM/dz = 0
+        const dMdzDuct = c0 * (1.0 - delta / zSafe);
+
+        // 平滑过渡到标准大气 (波导顶以上)
+        // 使用 tanh 平滑, 过渡区间约 2m
+        const transition = 0.5 * (1.0 - Math.tanh((zSafe - delta) / 2.0));
+        const dMdzAbove = 0.117; // 标准大气
+
+        const dMdz = dMdzDuct * (1.0 - transition) + dMdzAbove * transition;
+
+        // 限制物理合理范围
+        return Math.max(-2.0, Math.min(0.5, dMdz));
+      }
+
+      /**
+       * 计算高度 z 处的折射率剖面值 (用于 M 剖面显示)
+       *
+       * N(z) 使用对数廓线模型:
+       *   N(z) = N_surface + (N_ref - N_surface) * φ(z) / φ(z_ref)
+       *   φ(z) = ln(1 + z/z_0q)
+       */
+      refractivityProfile(z) {
+        const zSafe = Math.max(1e-5, z);
+        const phiZ = Math.log(1 + zSafe / this.z_0q);
+        const phiRef = Math.log(1 + this.refHeight / this.z_0q);
+
+        const N_surface = this.refractivity(this.seaTemp, this.pressure, 100); // RH=100 at surface
+        const N_ref = this.refractivity(this.airTemp, this.pressure, this.rh);
+
+        const N = N_surface + (N_ref - N_surface) * phiZ / phiRef;
+        return N;
+      }
+
+      /**
+       * M 剖面 = N(z) + (z/R_e)*1e6
+       */
+      modifiedRefractivityProfile(z) {
+        return this.refractivityProfile(z) + (z / this.R_EARTH) * 1e6;
+      }
+    }
+
+    // ============================================================
+    // 初始化蒸发波导模型
+    // ============================================================
+    const ductModel = new EvaporationDuctModel();
+
+    // ============================================================
+    // 基站工程参数
+    // ============================================================
+    const baseStationConfig = {
+      // --- 发射端 (Tx) ---
+      txPower: 43,
+      txAntennaGain: 17,
+      txHeight: 25,
+      txCableLoss: 3,
+      antennaType: 'directional',
+      beamwidthH: 65,
+      beamwidthV: 8,
+
+      // --- 系统参数 ---
+      frequency: 2600,
+      bandwidth: 20,
+      subcarrierSpacing: 15,
+
+      // --- 接收端 (Rx) ---
+      rxAntennaGain: 10,
+      rxHeight: 3,
+      rxNoiseFigure: 5,
+      rxCableLoss: 1,
+
+      // --- 逻辑位置 ---
+      positionX: -20,
+      positionY: 1.6 + 17.5,
+      positionZ: -22,
+    };
+
+    /**
+     * 海洋无线传播模型 — 集成了蒸发波导效应
+     *
+     * 路径损耗 = 基础损耗(双线/自由空间) - 波导陷获增益
+     */
+    class MaritimePropagationModel {
+      constructor(config, ductModel) {
+        this.config = config;
+        this.duct = ductModel;
+        this.c = 3e8;
+
+        this.wavelength = this.c / (config.frequency * 1e6);
+        this.eirp = config.txPower + config.txAntennaGain - config.txCableLoss;
+        this.criticalDistance = (4 * Math.PI * config.txHeight * config.rxHeight) / this.wavelength;
+
+        this.shadowFading = 0;
+        this.shadowFadingTarget = 0;
+        this.shadowFadingSpeed = 0.3;
+
+        this.fastFadingHistory = [];
+        this.fastFadingHistoryMaxLen = 20;
+
+        console.log('═══════════════════════════════════════');
+        console.log('🌊 海上传播模型已初始化 (含蒸发波导)');
+        console.log('───────────────────────────────────────');
+        console.log(`  EIRP:            ${this.eirp.toFixed(1)} dBm`);
+        console.log(`  波长 λ:          ${this.wavelength.toFixed(3)} m`);
+        console.log(`  临界距离 d_cross: ${this.criticalDistance.toFixed(1)} m`);
+        console.log(`  波导高度 δ:      ${this.duct.ductHeight.toFixed(2)} m`);
+        console.log(`  波导强度 ΔM:     ${this.duct.ductStrength.toFixed(1)} M-units`);
+        console.log(`  临界频率 f_c:    ${this.duct.criticalFreq.toFixed(0)} MHz`);
+        console.log(`  陷获状态:        ${this.duct.isTrapping ? '✅ 活跃' : '❌ 无波导'}`);
+        console.log('═══════════════════════════════════════');
+      }
+
+      computeSignal(distance, deltaTime) {
+        const cfg = this.config;
+        const d = Math.max(distance, 0.5);
+
+        // ---- 1. 基础路径损耗 ----
+        let pathLoss, modelName;
+
+        if (d < this.criticalDistance) {
+          const dKm = d / 1000;
+          pathLoss = 32.4 + 20 * Math.log10(cfg.frequency) + 20 * Math.log10(dKm);
+          modelName = '自由空间';
+        } else {
+          pathLoss = 40 * Math.log10(d)
+                   - 20 * Math.log10(cfg.txHeight)
+                   - 20 * Math.log10(cfg.rxHeight);
+          modelName = '双线地面反射';
+        }
+
+        // ---- 2. 蒸发波导陷获增益 ----
+        const ductGain = this.duct.computeTrappingGain(
+          cfg.txHeight, cfg.rxHeight, cfg.frequency
+        );
+        this.duct.trappingGain = ductGain;
+
+        // 波导增益降低有效路径损耗
+        const effectivePathLoss = pathLoss - ductGain;
+
+        // 更新模型名称
+        if (this.duct.isTrapping && ductGain > 0.5) {
+          if (cfg.frequency <= this.duct.criticalFreq) {
+            modelName = '蒸发波导 (全陷获)';
+          } else {
+            modelName = '蒸发波导 (部分陷获)';
+          }
+        }
+
+        // ---- 3. 慢衰落 ----
+        const SHADOW_STD = 3.5;
+        this.shadowFadingTarget += (Math.random() - 0.5) * 0.8 * deltaTime;
+        this.shadowFadingTarget = Math.max(-2.5, Math.min(2.5, this.shadowFadingTarget));
+        this.shadowFading += (this.shadowFadingTarget - this.shadowFading)
+                           * this.shadowFadingSpeed * deltaTime;
+        const shadowFactor = this.shadowFading * SHADOW_STD * Math.min(d / 500, 1.0);
+
+        // ---- 4. 快衰落 (海面多径干涉) ----
+        const phaseDiff = (2 * Math.PI * 2 * cfg.txHeight * cfg.rxHeight)
+                        / (this.wavelength * d);
+        const seaFading = 10 * Math.log10(
+          2 + 2 * Math.cos(phaseDiff + Math.sin(distance * 0.1) * 0.3)
+        ) - 6;
+
+        const waveFading = Math.sin(distance * 2.3 + performance.now() * 0.003) * 1.5;
+        const fastFading = seaFading + waveFading;
+
+        this.fastFadingHistory.push(fastFading);
+        if (this.fastFadingHistory.length > this.fastFadingHistoryMaxLen) {
+          this.fastFadingHistory.shift();
+        }
+        const smoothedFastFading = this.fastFadingHistory.reduce((a, b) => a + b, 0)
+                                 / this.fastFadingHistory.length;
+
+        // ---- 5. RSRP ----
+        const rxPower = this.eirp - effectivePathLoss + cfg.rxAntennaGain
+                      - cfg.rxCableLoss + shadowFactor + smoothedFastFading;
+
+        // ---- 6. SINR ----
+        const bwHz = cfg.bandwidth * 1e6;
+        const noisePower = -174 + 10 * Math.log10(bwHz) + cfg.rxNoiseFigure;
+        const sinr = rxPower - noisePower;
+
+        // ---- 7. RSRQ ----
+        const nRB = Math.floor(cfg.bandwidth * 1000 / (12 * cfg.subcarrierSpacing));
+        const rssi = rxPower + 10 * Math.log10(nRB) + 3;
+        const rsrq = rxPower - rssi - 10 * Math.log10(nRB);
+
+        return {
+          rsrp: rxPower,
+          sinr: sinr,
+          rsrq: rsrq,
+          pathLoss: effectivePathLoss,
+          rawPathLoss: pathLoss,
+          ductGain: ductGain,
+          distance: d,
+          modelName: modelName,
+          criticalDistance: this.criticalDistance,
+          shadowFading: shadowFactor,
+          fastFading: smoothedFastFading,
+        };
+      }
+    }
+
+    // 初始化传播模型 (集成了蒸发波导)
+    const propagationModel = new MaritimePropagationModel(baseStationConfig, ductModel);
+
+    // ============================================================
+    // 抛物方程 (PE) 传播求解器 — Split-Step Fourier 方法
+    // ============================================================
+    /**
+     * 抛物方程 (Parabolic Equation) 求解器
+     *
+     * PE 是 AREPS/PETOOL 等实际海上传播评估工具的标准算法。
+     * 与射线追踪(RT)的本质区别:
+     *   - RT 追踪离散射线, 在焦散区失效, 无法建模衍射
+     *   - PE 求解整个电磁场, 自动包含干涉、衍射、边界反射
+     *
+     * 算法: Split-Step Fourier (SSF)
+     *   从 Helmholtz 方程的抛物近似出发:
+     *     ∂²u/∂z² + 2jk ∂u/∂x + k²(n²-1)u = 0
+     *   分步求解:
+     *     1. u *= exp(jk(n²-1)Δx/2)     [折射率相位屏]
+     *     2. U = FFT{u}                   [→ 波数域]
+     *     3. U *= exp(-jπ²p²Δx/k)        [传播算子]
+     *     4. u = IFFT{U}                  [→ 空间域]
+     *     5. u *= exp(jk(n²-1)Δx/2)     [折射率相位屏]
+     *   海底边界: 镜像法 + 阻抗边界条件
+     */
+    class PESolver {
+      constructor(ductModel, config) {
+        this.duct = ductModel;
+        this.config = config;
+        this.freqMHz = config.frequency;
+
+        // PE 网格参数
+        this.NZ = 512;          // 高度方向格点数
+        this.ZMAX = 200;        // 最大高度 (m)
+        this.DZ = this.ZMAX / this.NZ;
+        this.RMAX = 500;        // 最大水平距离 (m)
+        this.DX = 2.0;          // 距离步长 (m)
+        this.NX = Math.floor(this.RMAX / this.DX);
+
+        // 波长和波数
+        this.lambda = 3e8 / (this.freqMHz * 1e6);
+        this.k0 = 2 * Math.PI / this.lambda;
+
+        // 场数组: [NZ][NX+1]
+        this.field = null;
+
+        // FFT 预计算: bit-reversal table, twiddle factors
+        this._fftN = this.NZ * 2; // zero-padded to 2×NZ
+        this._bitRev = null;
+        this._twiddles = null;
+
+        console.log('🔮 PE 传播求解器已初始化');
+        console.log(`  频率: ${this.freqMHz} MHz | λ: ${this.lambda.toFixed(3)} m`);
+        console.log(`  网格: ${this.NX} × ${this.NZ} (${this.RMAX}m × ${this.ZMAX}m)`);
+        console.log(`  步长: Δx=${this.DX}m, Δz=${this.DZ.toFixed(2)}m`);
+      }
+
+      /** 蝶形运算实现 radix-2 FFT (in-place, complex interleaved) */
+      _fft(cArr, inverse) {
+        const n = this._fftN;
+        // 惰性初始化 bit-reversal 和 twiddle factors
+        if (!this._bitRev || this._bitRev.length !== n) {
+          this._bitRev = new Int32Array(n);
+          const bits = Math.round(Math.log2(n));
+          for (let i = 0; i < n; i++) {
+            let r = 0, v = i;
+            for (let b = 0; b < bits; b++) {
+              r = (r << 1) | (v & 1);
+              v >>= 1;
+            }
+            this._bitRev[i] = r;
+          }
+          this._twiddles = new Float64Array(n);
+          const sign = inverse ? 1 : -1;
+          for (let i = 0; i < n / 2; i++) {
+            this._twiddles[2 * i]     = Math.cos(2 * Math.PI * i / n);
+            this._twiddles[2 * i + 1] = sign * Math.sin(2 * Math.PI * i / n);
+          }
+        }
+
+        // Bit-reversal permutation
+        for (let i = 0; i < n; i++) {
+          const j = this._bitRev[i];
+          if (j > i) {
+            const tr = cArr[2 * i], ti = cArr[2 * i + 1];
+            cArr[2 * i]     = cArr[2 * j];
+            cArr[2 * i + 1] = cArr[2 * j + 1];
+            cArr[2 * j]     = tr;
+            cArr[2 * j + 1] = ti;
+          }
+        }
+
+        // Butterfly
+        for (let len = 2; len <= n; len *= 2) {
+          const half = len / 2;
+          const step = n / len;
+          for (let i = 0; i < n; i += len) {
+            for (let j = 0; j < half; j++) {
+              const twR = this._twiddles[2 * j * step];
+              const twI = this._twiddles[2 * j * step + 1];
+              const aR = cArr[2 * (i + j)];
+              const aI = cArr[2 * (i + j) + 1];
+              const bR = cArr[2 * (i + j + half)];
+              const bI = cArr[2 * (i + j + half) + 1];
+              const tR = bR * twR - bI * twI;
+              const tI = bR * twI + bI * twR;
+              cArr[2 * (i + j)]         = aR + tR;
+              cArr[2 * (i + j) + 1]     = aI + tI;
+              cArr[2 * (i + j + half)]     = aR - tR;
+              cArr[2 * (i + j + half) + 1] = aI - tI;
+            }
+          }
+        }
+
+        if (inverse) {
+          for (let i = 0; i < n; i++) {
+            cArr[2 * i] /= n;
+            cArr[2 * i + 1] /= n;
+          }
+        }
+      }
+
+      /** 获取折射率 n(z) = 1 + N(z)*1e-6 */
+      _refractiveIndex(z) {
+        return 1.0 + this.duct.modifiedRefractivityProfile(z) * 1e-6;
+      }
+
+      /**
+       * 运行 PE 传播计算
+       * @returns {Float32Array[]} fieldAmplitude[row][col] in dB
+       */
+      solve() {
+        const NZ = this.NZ;
+        const NX = this.NX;
+        const DZ = this.DZ;
+        const DX = this.DX;
+        const k0 = this.k0;
+        const fftN = this._fftN;
+        const txHeight = this.config.txHeight;
+
+        // 预计算折射率剖面 (支持2D非均匀: 可传入M(x,z)提供者)
+        const nSqBase = new Float64Array(NZ);
+        for (let iz = 0; iz < NZ; iz++) {
+          const z = iz * DZ;
+          const n = this._refractiveIndex(z);
+          nSqBase[iz] = n * n;
+        }
+
+        // 2D非均匀折射率源 (可选)
+        const nSq2DProvider = this._nSq2DProvider || null;
+
+        // 初始场: 高斯波束, 中心在发射天线高度
+        const beamWidth = 3.0; // 波束宽度 (m), 约 3° @ 2600MHz
+        const txIz = Math.floor(txHeight / DZ);
+        const field = new Float64Array(fftN * 2); // complex interleaved [real, imag]
+        for (let iz = 0; iz < NZ; iz++) {
+          const z = iz * DZ;
+          const dz = z - txHeight;
+          const amp = Math.exp(-0.5 * (dz / beamWidth) ** 2);
+          // 添加向上的相位梯度 (模拟仰角)
+          const phase = 0;
+          field[2 * iz]     = amp * Math.cos(phase);
+          field[2 * iz + 1] = amp * Math.sin(phase);
+        }
+
+        // 存储每步的场幅 (dB)
+        const fieldDB = new Array(NX + 1);
+        for (let ix = 0; ix <= NX; ix++) {
+          fieldDB[ix] = new Float32Array(NZ);
+        }
+
+        // 记录初始场
+        for (let iz = 0; iz < NZ; iz++) {
+          const amp = Math.sqrt(field[2 * iz] ** 2 + field[2 * iz + 1] ** 2);
+          fieldDB[0][iz] = amp > 1e-10 ? 20 * Math.log10(amp) : -120;
+        }
+
+        // 预计算自由空间传播算子: exp(-j * π² * p² * DX / k0)
+        const propOp = new Float64Array(fftN * 2);
+        const dp = 1.0 / (fftN * DZ); // p-space resolution
+        for (let ip = 0; ip < fftN / 2; ip++) {
+          const p = ip * dp;
+          const phase = -Math.PI * Math.PI * p * p * DX / k0;
+          propOp[2 * ip]     = Math.cos(phase);
+          propOp[2 * ip + 1] = Math.sin(phase);
+        }
+        for (let ip = 0; ip < fftN / 2; ip++) {
+          const p = -(fftN / 2 - ip) * dp;
+          const phase = -Math.PI * Math.PI * p * p * DX / k0;
+          const idx = fftN / 2 + ip;
+          propOp[2 * idx]     = Math.cos(phase);
+          propOp[2 * idx + 1] = Math.sin(phase);
+        }
+
+        // 主步进循环
+        for (let ix = 0; ix < NX; ix++) {
+          // Step 1 & 5: 折射率相位屏 (支持2D非均匀)
+          for (let iz = 0; iz < NZ; iz++) {
+            let dn;
+            if (nSq2DProvider) {
+              // 2D非均匀: 使用当前距离步的局部折射率
+              const nSqLocal = nSq2DProvider(ix, iz * DZ);
+              dn = nSqLocal - 1.0;
+            } else {
+              dn = nSqBase[iz] - 1.0;
+            }
+            const phase = k0 * dn * DX;
+            const c = Math.cos(phase), s = Math.sin(phase);
+            const re = field[2 * iz], im = field[2 * iz + 1];
+            field[2 * iz]     = re * c - im * s;
+            field[2 * iz + 1] = re * s + im * c;
+          }
+
+          // 窗函数: 顶部吸收层 (避免上边界反射)
+          const absorbStart = Math.floor(NZ * 0.85);
+          for (let iz = absorbStart; iz < NZ; iz++) {
+            const frac = (iz - absorbStart) / (NZ - absorbStart);
+            const atten = Math.exp(-frac * frac * 8);
+            field[2 * iz]     *= atten;
+            field[2 * iz + 1] *= atten;
+          }
+
+          // Step 2: FFT
+          this._fft(field, false);
+
+          // Step 3: 传播算子
+          for (let ip = 0; ip < fftN; ip++) {
+            const pR = propOp[2 * ip], pI = propOp[2 * ip + 1];
+            const fR = field[2 * ip], fI = field[2 * ip + 1];
+            field[2 * ip]     = fR * pR - fI * pI;
+            field[2 * ip + 1] = fR * pI + fI * pR;
+          }
+
+          // Step 4: IFFT
+          this._fft(field, true);
+
+          // 海面边界条件: 镜像反射
+          // 在 z=0 处施加 Dirichlet 边界 (理想导体近似, 海面反射系数≈-1)
+          // 实际海面用 Fresnel 反射系数, 这里简化为 -0.8 (海水)
+          const reflCoeff = -0.85;
+          for (let iz = 0; iz < Math.min(5, NZ); iz++) {
+            // 反射镜像来自 iz < 0, 用前几个格点近似
+            const srcIz = Math.max(0, -iz + 1);
+            field[2 * iz]     += reflCoeff * field[2 * srcIz];
+            field[2 * iz + 1] += reflCoeff * field[2 * srcIz + 1];
+          }
+
+          // 存储场幅
+          for (let iz = 0; iz < NZ; iz++) {
+            const amp = Math.sqrt(field[2 * iz] ** 2 + field[2 * iz + 1] ** 2);
+            fieldDB[ix + 1][iz] = amp > 1e-10 ? 20 * Math.log10(amp) : -120;
+          }
+        }
+
+        this.field = fieldDB;
+        return fieldDB;
+      }
+
+      /**
+       * 将 PE 场渲染到 Canvas, 返回纹理
+       */
+      renderToCanvas(fieldDB) {
+        const NX = fieldDB.length - 1;
+        const NZ = this.NZ;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = NX + 1;
+        canvas.height = NZ;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(canvas.width, canvas.height);
+
+        // 找到动态范围
+        let maxDB = -Infinity, minDB = Infinity;
+        for (let ix = 0; ix <= NX; ix++) {
+          for (let iz = 0; iz < NZ; iz++) {
+            const v = fieldDB[ix][iz];
+            if (v > maxDB) maxDB = v;
+            if (v < minDB) minDB = v;
+          }
+        }
+        const dbRange = maxDB - minDB || 1;
+
+        // 颜色映射: 低(蓝→青) → 中(绿→黄) → 高(橙→红)
+        const colorMap = (t) => {
+          // t: 0(弱) → 1(强)
+          const tClamp = Math.max(0, Math.min(1, t));
+          let r, g, b;
+          if (tClamp < 0.25) {
+            const s = tClamp / 0.25;
+            r = 0.05; g = 0.1 + s * 0.5; b = 0.4 + s * 0.6;
+          } else if (tClamp < 0.5) {
+            const s = (tClamp - 0.25) / 0.25;
+            r = s * 0.3; g = 0.6 + s * 0.4; b = 1.0 - s * 0.5;
+          } else if (tClamp < 0.75) {
+            const s = (tClamp - 0.5) / 0.25;
+            r = 0.3 + s * 0.7; g = 1.0 - s * 0.3; b = 0.5 - s * 0.4;
+          } else {
+            const s = (tClamp - 0.75) / 0.25;
+            r = 1.0; g = 0.7 - s * 0.5; b = 0.1 - s * 0.05;
+          }
+          return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+        };
+
+        for (let iy = 0; iy < NZ; iy++) {
+          for (let ix = 0; ix <= NX; ix++) {
+            const iz = NZ - 1 - iy; // 翻转y轴: Canvas顶部=高空
+            const db = fieldDB[ix][iz];
+            const t = (db - minDB) / dbRange;
+            const [r, g, b] = colorMap(t);
+            const pixelIdx = (iy * canvas.width + ix) * 4;
+            imgData.data[pixelIdx]     = r;
+            imgData.data[pixelIdx + 1] = g;
+            imgData.data[pixelIdx + 2] = b;
+            imgData.data[pixelIdx + 3] = 230; // alpha
+          }
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+
+        // 绘制波导高度参考线
+        if (this.duct.isTrapping && this.duct.ductHeight > 0.5) {
+          const ductYPixel = NZ - 1 - Math.floor(this.duct.ductHeight / this.DZ);
+          ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+          ctx.setLineDash([4, 6]);
+          ctx.beginPath();
+          ctx.moveTo(0, ductYPixel);
+          ctx.lineTo(canvas.width, ductYPixel);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // 标注
+          ctx.fillStyle = 'rgba(255,255,255,0.8)';
+          ctx.font = '11px monospace';
+          ctx.fillText(`δ=${this.duct.ductHeight.toFixed(0)}m`, 8, ductYPixel - 4);
+
+          // 标注基站天线高度
+          const txYPixel = NZ - 1 - Math.floor(this.config.txHeight / this.DZ);
+          ctx.fillStyle = '#4fc3f7';
+          ctx.fillText('📡 Tx', 4, txYPixel - 4);
+        }
+
+        return new THREE.CanvasTexture(canvas);
+      }
+    }
+
+    const peSolver = new PESolver(ductModel, baseStationConfig);
+
+    // ============================================
+    // 1. 场景、相机、渲染器初始化
+    // ============================================
+    const scene = new THREE.Scene();
+
+    // 渐变天空背景
+    const canvas = document.createElement('canvas');
+    canvas.width = 2;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 512);
+    gradient.addColorStop(0, '#1a237e');     // 深蓝 (高空)
+    gradient.addColorStop(0.35, '#4fc3f7');   // 浅蓝
+    gradient.addColorStop(0.55, '#b3e5fc');   // 地平线附近
+    gradient.addColorStop(0.7, '#81d4fa');    // 海天交界
+    gradient.addColorStop(1, '#0277bd');      // 深海色
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 2, 512);
+    const skyTexture = new THREE.CanvasTexture(canvas);
+    scene.background = skyTexture;
+    scene.fog = new THREE.Fog(0x81d4fa, 80, 400);
+
+    // 主渲染器
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    document.body.appendChild(renderer.domElement);
+
+    // CSS2D 文字标签渲染器
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    document.body.appendChild(labelRenderer.domElement);
+
+    // 相机
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 800);
+    camera.position.set(60, 35, 80);
+    camera.lookAt(0, 0, 0);
+
+    // 轨道控制器
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 3, -10);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 15;
+    controls.maxDistance = 250;
+    controls.maxPolarAngle = Math.PI * 0.48; // 限制低于水平线
+    controls.update();
+
+    // ============================================
+    // 2. 光照系统
+    // ============================================
+    // 环境光 — 模拟天空散射
+    const ambientLight = new THREE.AmbientLight(0x8db4d0, 0.6);
+    scene.add(ambientLight);
+
+    // 半球光 — 天空/地面
+    const hemiLight = new THREE.HemisphereLight(0xffeeb1, 0x1a5276, 0.7);
+    scene.add(hemiLight);
+
+    // 主方向光 (太阳) — 带阴影
+    const sunLight = new THREE.DirectionalLight(0xfff5e6, 4.5);
+    sunLight.position.set(80, 60, -30);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 1;
+    sunLight.shadow.camera.far = 300;
+    sunLight.shadow.camera.left = -80;
+    sunLight.shadow.camera.right = 80;
+    sunLight.shadow.camera.top = 80;
+    sunLight.shadow.camera.bottom = -80;
+    sunLight.shadow.bias = -0.0003;
+    sunLight.shadow.normalBias = 0.02;
+    scene.add(sunLight);
+
+    // ============================================
+    // 3. 陆地 — 海岸地形
+    // ============================================
+    const landGroup = new THREE.Group();
+    scene.add(landGroup);
+
+    // 主陆地 — 使用 BoxGeometry 变形为坡地
+    const landGeo = new THREE.BoxGeometry(42, 4, 92, 24, 8, 48);
+
+    // 变形：将顶部向海边倾斜，模拟海岸坡地
+    const positions = landGeo.attributes.position;
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i);
+      const y = positions.getY(i);
+      const z = positions.getZ(i);
+
+      if (y > 0) {
+        // 向 +x 方向 (海边) 稍微降低，让陆地主体稳定坐落在左侧
+        const slopeFactor = THREE.MathUtils.clamp((x + 21) / 42, 0, 1);
+        const newY = y - slopeFactor * 2.5;
+        positions.setY(i, newY);
+      }
+
+      // 添加一些随机起伏
+      if (y > -0.5) {
+        const noise = (Math.sin(x * 0.8) * Math.cos(z * 0.6) * 0.6 +
+                       Math.sin(x * 2.1 + z * 1.3) * 0.25);
+        positions.setY(i, positions.getY(i) + noise);
+      }
+    }
+    landGeo.computeVertexNormals();
+
+    // 陆地材质 — 沙土/草地混合
+    const landMat = new THREE.MeshStandardMaterial({
+      color: 0xc2a76b,
+      roughness: 0.75,
+      metalness: 0.05,
+    });
+    const landMesh = new THREE.Mesh(landGeo, landMat);
+    landMesh.position.set(-36, -0.2, 0);
+    landMesh.castShadow = true;
+    landMesh.receiveShadow = true;
+    landGroup.add(landMesh);
+
+    // 草地覆盖层 — 顶部偏绿
+    const grassGeo = new THREE.PlaneGeometry(43, 93, 1, 1);
+    grassGeo.rotateX(-Math.PI / 2);
+    const grassMat = new THREE.MeshStandardMaterial({
+      color: 0x6b8e4e,
+      roughness: 0.8,
+      metalness: 0,
+      side: THREE.DoubleSide,
+    });
+    const grassPlane = new THREE.Mesh(grassGeo, grassMat);
+    grassPlane.position.set(-36, 1.4, 0);
+    grassPlane.receiveShadow = true;
+    landGroup.add(grassPlane);
+
+    // 沙滩 — 陆地与海洋交界
+    const beachGeo = new THREE.PlaneGeometry(12, 92, 1, 1);
+    beachGeo.rotateX(-Math.PI / 2);
+    const beachMat = new THREE.MeshStandardMaterial({
+      color: 0xe8d5a3,
+      roughness: 0.7,
+      metalness: 0,
+    });
+    const beach = new THREE.Mesh(beachGeo, beachMat);
+    beach.position.set(-11, 0.05, 0);
+    beach.receiveShadow = true;
+    landGroup.add(beach);
+
+    // ============================================
+    // 4. 基站塔 — 建在陆地上
+    // ============================================
+    const baseStationGroup = new THREE.Group();
+    baseStationGroup.position.set(-20, 1.6, -22);
+    landGroup.add(baseStationGroup);
+
+    // 底座平台
+    const platformGeo = new THREE.CylinderGeometry(3, 3.5, 0.6, 32);
+    const platformMat = new THREE.MeshStandardMaterial({
+      color: 0x757575,
+      roughness: 0.4,
+      metalness: 0.6,
+    });
+    const platform = new THREE.Mesh(platformGeo, platformMat);
+    platform.position.y = 0.3;
+    platform.castShadow = true;
+    platform.receiveShadow = true;
+    baseStationGroup.add(platform);
+
+    // 塔身 — 格构式钢塔
+    const createTowerSection = (bottomRadius, topRadius, height, yOffset) => {
+      const group = new THREE.Group();
+      group.position.y = yOffset;
+
+      // 四个主立柱
+      const legRadius = 0.12;
+      const legGeo = new THREE.CylinderGeometry(legRadius, legRadius, height, 8);
+      const legMat = new THREE.MeshStandardMaterial({
+        color: 0x9e9e9e,
+        roughness: 0.3,
+        metalness: 0.85,
+      });
+
+      for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 2) {
+        const dx = Math.cos(angle) * bottomRadius;
+        const dz = Math.sin(angle) * bottomRadius;
+        const leg = new THREE.Mesh(legGeo, legMat);
+        // 向内倾斜
+        leg.position.set(dx, height / 2, dz);
+        const leanAngle = Math.atan2(bottomRadius - topRadius, height) * 0.5;
+        leg.rotation.z = Math.cos(angle) * leanAngle;
+        leg.rotation.x = -Math.sin(angle) * leanAngle;
+        leg.castShadow = true;
+        leg.receiveShadow = true;
+        group.add(leg);
+      }
+
+      // 交叉支撑 (简化用横梁)
+      for (let i = 0; i < 3; i++) {
+        const y = (i / 2) * height;
+        const r = bottomRadius + (topRadius - bottomRadius) * (i / 2);
+        const ringGeo = new THREE.TorusGeometry(r, 0.06, 8, 4);
+        const ring = new THREE.Mesh(ringGeo, legMat);
+        ring.position.y = y;
+        ring.rotation.x = Math.PI / 2;
+        ring.castShadow = true;
+        group.add(ring);
+      }
+
+      return group;
+    };
+
+    const section1 = createTowerSection(1.8, 1.3, 5, 0.8);
+    baseStationGroup.add(section1);
+
+    const section2 = createTowerSection(1.3, 0.9, 5, 5.8);
+    baseStationGroup.add(section2);
+
+    const section3 = createTowerSection(0.9, 0.5, 4, 10.8);
+    baseStationGroup.add(section3);
+
+    // 顶部平台 — 天线安装处
+    const topPlatformGeo = new THREE.CylinderGeometry(0.6, 0.7, 0.3, 32);
+    const topPlatform = new THREE.Mesh(topPlatformGeo, platformMat);
+    topPlatform.position.y = 15;
+    topPlatform.castShadow = true;
+    baseStationGroup.add(topPlatform);
+
+    // 天线桅杆
+    const mastGeo = new THREE.CylinderGeometry(0.08, 0.08, 3, 12);
+    const mastMat = new THREE.MeshStandardMaterial({
+      color: 0xcfd8dc,
+      roughness: 0.2,
+      metalness: 0.9,
+    });
+    const mast = new THREE.Mesh(mastGeo, mastMat);
+    mast.position.y = 16.5;
+    mast.castShadow = true;
+    baseStationGroup.add(mast);
+
+    // 天线面板 (定向天线)
+    const createAntennaPanel = (x, y, z, rotY) => {
+      const panelGeo = new THREE.BoxGeometry(0.8, 1.6, 0.1);
+      const panelMat = new THREE.MeshStandardMaterial({
+        color: 0xe0e0e0,
+        roughness: 0.15,
+        metalness: 0.8,
+      });
+      const panel = new THREE.Mesh(panelGeo, panelMat);
+      panel.position.set(x, y, z);
+      panel.rotation.y = rotY;
+      panel.castShadow = true;
+      return panel;
+    };
+
+    baseStationGroup.add(createAntennaPanel(0.25, 17, 0.15, Math.PI * 0.15));
+    baseStationGroup.add(createAntennaPanel(-0.25, 17, 0.15, -Math.PI * 0.15));
+
+    // 信号灯 (红色航空障碍灯)
+    const beaconGeo = new THREE.SphereGeometry(0.15, 16, 16);
+    const beaconMat = new THREE.MeshStandardMaterial({
+      color: 0xff1744,
+      roughness: 0.2,
+      emissive: 0xff0000,
+      emissiveIntensity: 2,
+    });
+    const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+    beacon.position.y = 18.2;
+    baseStationGroup.add(beacon);
+
+    // 基站标签
+    const baseLabelDiv = document.createElement('div');
+    baseLabelDiv.textContent = '📡 基站';
+    baseLabelDiv.style.cssText = 'color:#fff;font-size:14px;font-weight:bold;background:rgba(0,0,0,0.7);padding:4px 10px;border-radius:12px;white-space:nowrap;';
+    const baseLabel = new CSS2DObject(baseLabelDiv);
+    baseLabel.position.set(0, 19.5, 0);
+    baseStationGroup.add(baseLabel);
+
+    // 设备机房 (小建筑)
+    const buildingGeo = new THREE.BoxGeometry(3, 2, 2.5);
+    const buildingMat = new THREE.MeshStandardMaterial({
+      color: 0xeeeeee,
+      roughness: 0.5,
+      metalness: 0.3,
+    });
+    const building = new THREE.Mesh(buildingGeo, buildingMat);
+    building.position.set(3, 1.2, 0);
+    building.castShadow = true;
+    building.receiveShadow = true;
+    baseStationGroup.add(building);
+
+    // 机房屋顶
+    const roofGeo = new THREE.ConeGeometry(2.2, 0.8, 4);
+    const roofMat = new THREE.MeshStandardMaterial({
+      color: 0xb71c1c,
+      roughness: 0.4,
+      metalness: 0.4,
+    });
+    const roof = new THREE.Mesh(roofGeo, roofMat);
+    roof.position.set(3, 2.6, 0);
+    roof.rotation.y = Math.PI / 4;
+    roof.castShadow = true;
+    baseStationGroup.add(roof);
+
+    // 使用 img2threejs 风格重建岸边 5G 基站：塔架、开放机柜、天线阵列和彩色线缆
+    baseStationGroup.clear();
+    baseStationGroup.position.set(-12.5, 1.35, -8);
+    baseStationGroup.rotation.y = -0.16;
+    baseStationGroup.scale.setScalar(0.92);
+
+    const stationMaterials = {
+      pad: new THREE.MeshStandardMaterial({ color: 0xc9d0d2, roughness: 0.55, metalness: 0.08 }),
+      steel: new THREE.MeshStandardMaterial({ color: 0xb8c3c8, roughness: 0.25, metalness: 0.78 }),
+      dark: new THREE.MeshStandardMaterial({ color: 0x263036, roughness: 0.62, metalness: 0.24 }),
+      white: new THREE.MeshStandardMaterial({ color: 0xf4f5f5, roughness: 0.28, metalness: 0.12 }),
+      blue: new THREE.MeshStandardMaterial({ color: 0x1768d6, roughness: 0.34, emissive: 0x0646a9, emissiveIntensity: 0.18 }),
+      cabinetFace: new THREE.MeshStandardMaterial({ color: 0x2f363a, roughness: 0.48, metalness: 0.35 })
+    };
+
+    const addStationMesh = (geometry, material, position, rotation = null, parent = baseStationGroup) => {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(position);
+      if (rotation) mesh.rotation.set(rotation.x || 0, rotation.y || 0, rotation.z || 0);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    };
+
+    const addStationCylinder = (start, end, radius, material, parent = baseStationGroup) => {
+      const delta = new THREE.Vector3().subVectors(end, start);
+      const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, delta.length(), 10), material);
+      mesh.position.copy(mid);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    };
+
+    addStationMesh(new THREE.BoxGeometry(9.8, 0.55, 7.4), stationMaterials.pad, new THREE.Vector3(0, 0.28, 0));
+    addStationMesh(new THREE.BoxGeometry(4.0, 5.5, 2.0), stationMaterials.white, new THREE.Vector3(2.0, 3.05, 0.28));
+    addStationMesh(new THREE.BoxGeometry(2.75, 4.25, 0.14), stationMaterials.cabinetFace, new THREE.Vector3(2.0, 2.85, 1.38));
+    addStationMesh(new THREE.BoxGeometry(1.55, 5.2, 0.1), stationMaterials.white, new THREE.Vector3(-0.16, 3.02, 1.42), { y: -0.72 });
+    addStationMesh(new THREE.BoxGeometry(1.55, 5.2, 0.1), stationMaterials.white, new THREE.Vector3(4.1, 3.02, 1.42), { y: 0.72 });
+
+    for (let i = 0; i < 6; i++) {
+      const y = 1.18 + i * 0.55;
+      addStationMesh(new THREE.BoxGeometry(2.32, 0.28, 0.18), stationMaterials.steel, new THREE.Vector3(2.0, y, 1.52));
+      for (let j = 0; j < 4; j++) {
+        addStationMesh(new THREE.BoxGeometry(0.22, 0.08, 0.035), stationMaterials.blue, new THREE.Vector3(1.23 + j * 0.43, y, 1.64));
+      }
+    }
+
+    const cableColors = [0x168dff, 0xf2a33a, 0xffdf4b, 0x35bd60, 0x7e64ff];
+    for (let i = 0; i < cableColors.length; i++) {
+      const cableMat = new THREE.MeshStandardMaterial({ color: cableColors[i], roughness: 0.36, metalness: 0.08 });
+      const x = 0.92 + i * 0.38;
+      addStationCylinder(new THREE.Vector3(x, 0.9, 1.68), new THREE.Vector3(x, 5.75, 1.68), 0.04, cableMat);
+      addStationCylinder(new THREE.Vector3(x, 0.9, 1.68), new THREE.Vector3(x - 3.6 + i * 0.45, 0.05, 3.15), 0.052, cableMat);
+    }
+
+    const towerGroup = new THREE.Group();
+    towerGroup.position.set(-1.65, 0.52, -0.3);
+    baseStationGroup.add(towerGroup);
+    const levels = [0, 3.0, 6.0, 9.0, 12.0, 15.0];
+    const legBase = [
+      new THREE.Vector3(-1.65, 0, -1.35),
+      new THREE.Vector3(1.65, 0, -1.35),
+      new THREE.Vector3(-1.65, 0, 1.35),
+      new THREE.Vector3(1.65, 0, 1.35)
+    ];
+    const legTop = [
+      new THREE.Vector3(-0.52, 15, -0.45),
+      new THREE.Vector3(0.52, 15, -0.45),
+      new THREE.Vector3(-0.52, 15, 0.45),
+      new THREE.Vector3(0.52, 15, 0.45)
+    ];
+    for (let i = 0; i < 4; i++) addStationCylinder(legBase[i], legTop[i], 0.065, stationMaterials.steel, towerGroup);
+    for (let i = 0; i < levels.length; i++) {
+      const t = levels[i] / 15;
+      const r = THREE.MathUtils.lerp(1.65, 0.52, t);
+      addStationCylinder(new THREE.Vector3(-r, levels[i], -r * 0.82), new THREE.Vector3(r, levels[i], -r * 0.82), 0.04, stationMaterials.steel, towerGroup);
+      addStationCylinder(new THREE.Vector3(-r, levels[i], r * 0.82), new THREE.Vector3(r, levels[i], r * 0.82), 0.04, stationMaterials.steel, towerGroup);
+      addStationCylinder(new THREE.Vector3(-r, levels[i], -r * 0.82), new THREE.Vector3(-r, levels[i], r * 0.82), 0.04, stationMaterials.steel, towerGroup);
+      addStationCylinder(new THREE.Vector3(r, levels[i], -r * 0.82), new THREE.Vector3(r, levels[i], r * 0.82), 0.04, stationMaterials.steel, towerGroup);
+    }
+    for (let i = 0; i < levels.length - 1; i++) {
+      const y0 = levels[i];
+      const y1 = levels[i + 1];
+      const r0 = THREE.MathUtils.lerp(1.65, 0.52, y0 / 15);
+      const r1 = THREE.MathUtils.lerp(1.65, 0.52, y1 / 15);
+      addStationCylinder(new THREE.Vector3(-r0, y0, -r0 * 0.82), new THREE.Vector3(r1, y1, -r1 * 0.82), 0.032, stationMaterials.steel, towerGroup);
+      addStationCylinder(new THREE.Vector3(r0, y0, r0 * 0.82), new THREE.Vector3(-r1, y1, r1 * 0.82), 0.032, stationMaterials.steel, towerGroup);
+      addStationCylinder(new THREE.Vector3(-r0, y0, r0 * 0.82), new THREE.Vector3(r1, y1, r1 * 0.82), 0.032, stationMaterials.steel, towerGroup);
+      addStationCylinder(new THREE.Vector3(r0, y0, -r0 * 0.82), new THREE.Vector3(-r1, y1, -r1 * 0.82), 0.032, stationMaterials.steel, towerGroup);
+    }
+
+    addStationMesh(new THREE.CylinderGeometry(0.09, 0.09, 3.4, 16), stationMaterials.steel, new THREE.Vector3(0, 16.6, 0), null, towerGroup);
+    addStationMesh(new THREE.SphereGeometry(0.42, 24, 16), stationMaterials.white, new THREE.Vector3(0, 18.55, 0), null, towerGroup);
+
+    const createImg2ThreePanel = (angle, y, radius, label = false) => {
+      const panelGroup = new THREE.Group();
+      panelGroup.position.set(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+      panelGroup.rotation.y = -angle + Math.PI / 2;
+      addStationMesh(new THREE.BoxGeometry(0.58, 3.05, 0.18), stationMaterials.white, new THREE.Vector3(0, 0, 0), null, panelGroup);
+      addStationMesh(new THREE.BoxGeometry(0.34, 0.34, 0.04), stationMaterials.blue, new THREE.Vector3(0, 0.72, 0.13), null, panelGroup);
+      if (label) panelGroup.name = 'img2threejs-style-5g-panel';
+      towerGroup.add(panelGroup);
+    };
+    for (let i = 0; i < 6; i++) createImg2ThreePanel(i * Math.PI / 3, 13.75 + (i % 2) * 0.78, 2.2, i === 0);
+
+    for (let i = 0; i < 5; i++) {
+      const angle = i * Math.PI * 0.4 + 0.18;
+      const x = Math.cos(angle) * 1.2;
+      const z = Math.sin(angle) * 1.2;
+      addStationCylinder(new THREE.Vector3(x * 0.54, 11.6, z * 0.54), new THREE.Vector3(x, 14.35, z), 0.032, stationMaterials.dark, towerGroup);
+    }
+
+    addStationMesh(
+      new THREE.SphereGeometry(0.14, 16, 16),
+      new THREE.MeshStandardMaterial({ color: 0xff1744, roughness: 0.2, emissive: 0xff0000, emissiveIntensity: 2 }),
+      new THREE.Vector3(0, 19.25, 0),
+      null,
+      towerGroup
+    );
+
+    const rebuiltBaseLabelDiv = document.createElement('div');
+    rebuiltBaseLabelDiv.textContent = '📡 岸边 5G 基站';
+    rebuiltBaseLabelDiv.style.cssText = 'color:#fff;font-size:14px;font-weight:bold;background:rgba(0,0,0,0.7);padding:4px 10px;border-radius:12px;white-space:nowrap;';
+    const rebuiltBaseLabel = new CSS2DObject(rebuiltBaseLabelDiv);
+    rebuiltBaseLabel.position.set(0, 20.4, 0);
+    baseStationGroup.add(rebuiltBaseLabel);
+
+    const smallDish = new THREE.Mesh(new THREE.SphereGeometry(0.82, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), stationMaterials.white);
+    smallDish.position.set(-5.35, 4.35, -0.15);
+    smallDish.rotation.set(-0.42, 0.82, 0);
+    smallDish.scale.z = 0.28;
+    smallDish.castShadow = true;
+    baseStationGroup.add(smallDish);
+    addStationCylinder(new THREE.Vector3(-5.35, 0.45, -0.15), new THREE.Vector3(-5.35, 4.0, -0.15), 0.05, stationMaterials.steel);
+    addStationMesh(new THREE.BoxGeometry(2.15, 2.35, 1.75), stationMaterials.white, new THREE.Vector3(-5.15, 1.78, 2.25));
+
+    // ============================================
+    // 5. 海面
+    // ============================================
+    const oceanSize = 120;
+    const oceanSegments = 200;
+
+    const oceanGeo = new THREE.PlaneGeometry(oceanSize, oceanSize, oceanSegments, oceanSegments);
+    oceanGeo.rotateX(-Math.PI / 2);
+
+    const oceanMat = new THREE.MeshStandardMaterial({
+      color: 0x0d47a1,
+      roughness: 0.15,
+      metalness: 0.3,
+      side: THREE.DoubleSide,
+    });
+
+    const ocean = new THREE.Mesh(oceanGeo, oceanMat);
+    ocean.position.set(5, 0.5, 5);
+    ocean.receiveShadow = true;
+    ocean.name = 'ocean';
+    scene.add(ocean);
+
+    // 海面顶点 (保存引用用于波浪动画)
+    const oceanVertices = oceanGeo.attributes.position;
+    const oceanBaseY = new Float32Array(oceanVertices.count);
+    for (let i = 0; i < oceanVertices.count; i++) {
+      oceanBaseY[i] = oceanVertices.getY(i);
+    }
+
+    // 海底 — 提供深度感
+    const seabedGeo = new THREE.PlaneGeometry(oceanSize, oceanSize);
+    seabedGeo.rotateX(-Math.PI / 2);
+    const seabedMat = new THREE.MeshStandardMaterial({
+      color: 0x8d6e63,
+      roughness: 0.9,
+      metalness: 0,
+    });
+    const seabed = new THREE.Mesh(seabedGeo, seabedMat);
+    seabed.position.set(5, -4, 5);
+    seabed.receiveShadow = true;
+    scene.add(seabed);
+
+    // ============================================
+    // 5b. 蒸发波导可视化层
+    // ============================================
+    // 半透明层表示波导高度 — 当波导存在时可见
+    const ductVisGroup = new THREE.Group();
+    ductVisGroup.name = 'duct-visualization';
+    scene.add(ductVisGroup);
+
+    // 波导底面 (海面之上的透明平面)
+    const ductPlaneGeo = new THREE.PlaneGeometry(oceanSize * 0.9, oceanSize * 0.9);
+    const ductPlaneMat = new THREE.MeshBasicMaterial({
+      color: 0xff9800,
+      transparent: true,
+      opacity: 0.06,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const ductPlane = new THREE.Mesh(ductPlaneGeo, ductPlaneMat);
+    ductPlane.rotation.x = -Math.PI / 2;
+    ductPlane.position.set(5, 2, 5);
+    ductPlane.name = 'duct-plane';
+    ductVisGroup.add(ductPlane);
+
+    // 波导边界线框 (显示陷获层的空间范围)
+    const ductEdgeGeo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(oceanSize * 0.7, oceanSize * 0.7));
+    const ductEdgeMat = new THREE.LineBasicMaterial({
+      color: 0xff9800,
+      transparent: true,
+      opacity: 0.25,
+      depthTest: true,
+    });
+    const ductEdge = new THREE.LineSegments(ductEdgeGeo, ductEdgeMat);
+    ductEdge.rotation.x = -Math.PI / 2;
+    ductEdge.position.set(5, 2, 5);
+    ductEdge.name = 'duct-edge';
+    ductVisGroup.add(ductEdge);
+
+    // 波导陷获射线 — 表示被波导俘获向下弯曲的信号
+    const ductTrappedRaysGroup = new THREE.Group();
+    ductTrappedRaysGroup.name = 'duct-trapped-rays';
+    ductVisGroup.add(ductTrappedRaysGroup);
+
+    // 预创建陷获射线的曲线
+    const createTrappedRay = (startX, startZ, angleOffset) => {
+      const points = [];
+      const startY = ductModel.ductHeight * 0.6;
+      const maxDist = 60;
+      const segments = 40;
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const dist = t * maxDist;
+        const x = startX + Math.cos(angleOffset) * dist;
+        const z = startZ + Math.sin(angleOffset) * dist;
+        // 射线在波导内上下振荡
+        const oscY = startY + Math.sin(t * Math.PI * 4) * ductModel.ductHeight * 0.35;
+        const y = Math.max(0.3, Math.min(ductModel.ductHeight * 0.9, oscY));
+        points.push(new THREE.Vector3(x, y, z));
+      }
+      const curve = new THREE.CatmullRomCurve3(points);
+      const geo = new THREE.TubeGeometry(curve, 30, 0.03, 4, false);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xffa726,
+        transparent: true,
+        opacity: 0.35,
+        depthTest: true,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.name = 'trapped-ray';
+      return mesh;
+    };
+
+    // 初始创建几条射线
+    const SEA_LEVEL = 0.5; // 海面基准高度 (ocean.position.y)
+
+    const updateDuctVisualization = () => {
+      // 清空旧射线
+      while (ductTrappedRaysGroup.children.length > 0) {
+        const child = ductTrappedRaysGroup.children[0];
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+        ductTrappedRaysGroup.remove(child);
+      }
+
+      const hasDuct = ductModel.isTrapping && ductModel.ductHeight > 0.5;
+      // 波导顶 = 海面之上 λ 处
+      const ductTopY = SEA_LEVEL + ductModel.ductHeight;
+
+      // 更新波导平面 — 始终显示在计算高度处
+      ductPlane.position.y = ductTopY;
+      ductEdge.position.y = ductTopY;
+      // 波导平面/框: 有波导时明显, 无波导时淡
+      ductPlane.material.opacity = hasDuct ? 0.12 : 0.02;
+      ductEdge.material.opacity = hasDuct ? 0.6 : 0.08;
+
+      // 颜色: 强波导 = 深橙, 弱 = 淡黄
+      if (hasDuct) {
+        const intensity = Math.min(1, ductModel.ductStrength / 15);
+        const r = 1.0;
+        const g = 0.55 + (1 - intensity) * 0.45;
+        const b = 0.1 + (1 - intensity) * 0.3;
+        ductPlane.material.color.setRGB(r, g, b);
+        ductEdge.material.color.setRGB(r, g, b);
+      }
+
+      // 重新创建装饰射线 (现有射线追踪已处理真正物理射线)
+      if (hasDuct) {
+        const bsWorld = new THREE.Vector3();
+        baseStationGroup.getWorldPosition(bsWorld);
+        const numRays = Math.floor(ductModel.ductHeight / 3) + 3;
+        for (let i = 0; i < numRays; i++) {
+          const angle = (i / numRays) * Math.PI * 0.7 - Math.PI * 0.35;
+          const ray = createTrappedRay(bsWorld.x + 5, bsWorld.z + 5, angle);
+          ductTrappedRaysGroup.add(ray);
+        }
+      }
+    };
+
+    // 初始调用
+    updateDuctVisualization();
+
+    // ============================================
+    // 6. 船只 + 接收机
+    // ============================================
+    const boatGroup = new THREE.Group();
+    boatGroup.position.set(25, 1.2, 20);
+    scene.add(boatGroup);
+
+    // 船体
+    const hullShape = new THREE.Shape();
+    hullShape.moveTo(0, 1.5);
+    hullShape.bezierCurveTo(0.8, 1.5, 1.8, 0.8, 2.2, 0);
+    hullShape.lineTo(2.2, -0.5);
+    hullShape.bezierCurveTo(1.8, -1.0, 0.8, -1.2, 0, -1.2);
+    hullShape.bezierCurveTo(-0.8, -1.2, -1.8, -1.0, -2.2, -0.5);
+    hullShape.lineTo(-2.2, 0);
+    hullShape.bezierCurveTo(-1.8, 0.8, -0.8, 1.5, 0, 1.5);
+
+    const extrudeSettings = { steps: 20, depth: 6 };
+    const hullGeo = new THREE.ExtrudeGeometry(hullShape, extrudeSettings);
+    hullGeo.rotateX(-Math.PI / 2);
+    hullGeo.translate(0, 0.5, 0);
+
+    const hullMat = new THREE.MeshStandardMaterial({
+      color: 0xf5f5f5,
+      roughness: 0.35,
+      metalness: 0.5,
+    });
+    const hull = new THREE.Mesh(hullGeo, hullMat);
+    hull.scale.set(1.4, 1, 1.4);
+    hull.castShadow = true;
+    hull.receiveShadow = true;
+    boatGroup.add(hull);
+
+    // 甲板
+    const deckGeo = new THREE.BoxGeometry(2.9, 0.15, 4.5);
+    const deckMat = new THREE.MeshStandardMaterial({
+      color: 0x8d6e63,
+      roughness: 0.7,
+      metalness: 0.1,
+    });
+    const deck = new THREE.Mesh(deckGeo, deckMat);
+    deck.position.y = 0.7;
+    deck.castShadow = true;
+    deck.receiveShadow = true;
+    boatGroup.add(deck);
+
+    // 船舱/驾驶室
+    const cabinGeo = new THREE.BoxGeometry(1.8, 1.3, 2.2);
+    const cabinMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.4,
+      metalness: 0.3,
+    });
+    const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+    cabin.position.set(0, 1.5, -0.3);
+    cabin.castShadow = true;
+    cabin.receiveShadow = true;
+    boatGroup.add(cabin);
+
+    // 驾驶室窗户
+    const windowGeo = new THREE.BoxGeometry(1.3, 0.6, 0.05);
+    const windowMat = new THREE.MeshStandardMaterial({
+      color: 0x4fc3f7,
+      roughness: 0.1,
+      metalness: 0.5,
+      emissive: 0x0288d1,
+      emissiveIntensity: 0.3,
+    });
+    const windshield = new THREE.Mesh(windowGeo, windowMat);
+    windshield.position.set(0, 1.6, -1.1);
+    boatGroup.add(windshield);
+    // 侧窗
+    const sideWindow1 = new THREE.Mesh(windowGeo.clone(), windowMat);
+    sideWindow1.rotation.y = Math.PI / 2;
+    sideWindow1.position.set(0.9, 1.6, -0.3);
+    boatGroup.add(sideWindow1);
+    const sideWindow2 = new THREE.Mesh(windowGeo.clone(), windowMat);
+    sideWindow2.rotation.y = Math.PI / 2;
+    sideWindow2.position.set(-0.9, 1.6, -0.3);
+    boatGroup.add(sideWindow2);
+
+    // ============================================
+    // 7. 接收机设备 (在船甲板上)
+    // ============================================
+    const receiverGroup = new THREE.Group();
+    receiverGroup.position.set(0, 1.05, -1.2);
+    boatGroup.add(receiverGroup);
+
+    // 设备底座
+    const receiverBaseGeo = new THREE.CylinderGeometry(0.3, 0.35, 0.3, 16);
+    const receiverBase = new THREE.Mesh(receiverBaseGeo, new THREE.MeshStandardMaterial({
+      color: 0x546e7a,
+      roughness: 0.25,
+      metalness: 0.7,
+    }));
+    receiverBase.position.y = 0.15;
+    receiverBase.castShadow = true;
+    receiverGroup.add(receiverBase);
+
+    // 接收机主体
+    const receiverBodyGeo = new THREE.BoxGeometry(0.5, 0.7, 0.5);
+    const receiverBody = new THREE.Mesh(receiverBodyGeo, new THREE.MeshStandardMaterial({
+      color: 0x37474f,
+      roughness: 0.2,
+      metalness: 0.8,
+    }));
+    receiverBody.position.y = 0.65;
+    receiverBody.castShadow = true;
+    receiverGroup.add(receiverBody);
+
+    // 接收天线 (碟形)
+    const dishGeo = new THREE.SphereGeometry(0.25, 16, 8, 0, Math.PI * 2, 0, Math.PI / 3);
+    const dishMat = new THREE.MeshStandardMaterial({
+      color: 0xb0bec5,
+      roughness: 0.15,
+      metalness: 0.9,
+      side: THREE.DoubleSide,
+    });
+    const dish = new THREE.Mesh(dishGeo, dishMat);
+    dish.position.set(0, 0.85, 0.25);
+    dish.rotation.x = -Math.PI / 3;
+    dish.castShadow = true;
+    receiverGroup.add(dish);
+
+    // 天线馈源
+    const feedGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.2, 8);
+    const feed = new THREE.Mesh(feedGeo, new THREE.MeshStandardMaterial({
+      color: 0x90a4ae,
+      roughness: 0.1,
+      metalness: 0.9,
+    }));
+    feed.position.set(0, 0.85, 0.1);
+    feed.rotation.x = -Math.PI / 3;
+    receiverGroup.add(feed);
+
+    // 接收机指示灯
+    const rxLightGeo = new THREE.SphereGeometry(0.06, 8, 8);
+    const rxLightMat = new THREE.MeshStandardMaterial({
+      color: 0x00e676,
+      roughness: 0.1,
+      emissive: 0x00e676,
+      emissiveIntensity: 1.5,
+    });
+    const rxLight = new THREE.Mesh(rxLightGeo, rxLightMat);
+    rxLight.position.set(0.15, 1.1, 0.1);
+    receiverGroup.add(rxLight);
+
+    // 接收机标签
+    const rxLabelDiv = document.createElement('div');
+    rxLabelDiv.textContent = '📻 接收机';
+    rxLabelDiv.style.cssText = 'color:#fff;font-size:12px;background:rgba(0,0,0,0.7);padding:2px 8px;border-radius:10px;white-space:nowrap;';
+    const rxLabel = new CSS2DObject(rxLabelDiv);
+    rxLabel.position.set(0, 1.6, 0);
+    receiverGroup.add(rxLabel);
+
+    // ============================================
+    // 8. 桅杆和导航灯
+    // ============================================
+    const mastPoleGeo = new THREE.CylinderGeometry(0.06, 0.06, 3, 8);
+    const mastPole = new THREE.Mesh(mastPoleGeo, new THREE.MeshStandardMaterial({
+      color: 0x90a4ae,
+      roughness: 0.3,
+      metalness: 0.7,
+    }));
+    mastPole.position.set(0, 2.5, 0.5);
+    mastPole.castShadow = true;
+    boatGroup.add(mastPole);
+
+    // 导航灯
+    const navLightGeo = new THREE.SphereGeometry(0.1, 8, 8);
+    const navLightMat = new THREE.MeshStandardMaterial({
+      color: 0xff1744,
+      roughness: 0.2,
+      emissive: 0xff0000,
+      emissiveIntensity: 1.5,
+    });
+    const navLight = new THREE.Mesh(navLightGeo, navLightMat);
+    navLight.position.set(0, 3.9, 0.5);
+    boatGroup.add(navLight);
+
+    // 船名标签
+    const boatLabelDiv = document.createElement('div');
+    boatLabelDiv.textContent = '🚢 探测船';
+    boatLabelDiv.style.cssText = 'color:#fff;font-size:13px;font-weight:bold;background:rgba(0,0,0,0.7);padding:3px 10px;border-radius:12px;white-space:nowrap;';
+    const boatLabel = new CSS2DObject(boatLabelDiv);
+    boatLabel.position.set(0, 4.5, 0);
+    boatGroup.add(boatLabel);
+
+    // ============================================
+    // 9. PE 场强热力图 — 抛物方程传播结果可视化
+    // ============================================
+    const peVisGroup = new THREE.Group();
+    peVisGroup.name = 'pe-visualization';
+    scene.add(peVisGroup);
+
+    // PE 热力图垂直平面 (Range × Height 剖面)
+    const pePlaneWidth = 80;   // 水平范围 (3D场景中的m)
+    const pePlaneHeight = 60;  // 垂直范围 (m)
+    const pePlaneGeo = new THREE.PlaneGeometry(pePlaneWidth, pePlaneHeight);
+    const pePlaneMat = new THREE.MeshBasicMaterial({
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85,
+      depthTest: true,
+      depthWrite: false,
+    });
+    const pePlane = new THREE.Mesh(pePlaneGeo, pePlaneMat);
+    pePlane.name = 'pe-heatmap';
+    pePlane.visible = false; // 默认隐藏, PE数据在左下角图表中展示
+    // 位置: 从基站附近延伸到海域
+    pePlane.position.set(15, pePlaneHeight / 2 + 0.5, 10);
+    pePlane.rotation.y = Math.PI * 0.15; // 微旋转朝向海域
+    peVisGroup.add(pePlane);
+
+    // 通信链路分组
+    const commLinkGroup = new THREE.Group();
+    commLinkGroup.name = 'comm-link';
+    scene.add(commLinkGroup);
+
+    /**
+     * 创建通信链路 (基站→接收机的曲线)
+     */
+    const createCommLink = () => {
+      while (commLinkGroup.children.length > 0) {
+        const c = commLinkGroup.children[0];
+        if (c.geometry) c.geometry.dispose();
+        if (c.material) c.material.dispose();
+        commLinkGroup.remove(c);
+      }
+
+      const startPos = new THREE.Vector3(0, 17.5, 0);
+      baseStationGroup.localToWorld(startPos);
+      const endPos = new THREE.Vector3();
+      receiverGroup.getWorldPosition(endPos);
+
+      // 简单弧线
+      const mid = new THREE.Vector3().lerpVectors(startPos, endPos, 0.5);
+      mid.y += 5;
+      const curve = new THREE.QuadraticBezierCurve3(startPos, mid, endPos);
+      const pts = curve.getPoints(40);
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({
+        color: 0x4fc3f7, transparent: true, opacity: 0.7, depthTest: true
+      });
+      commLinkGroup.add(new THREE.Line(geo, mat));
+
+      return { points: pts, startPos, endPos, distance: startPos.distanceTo(endPos) };
+    };
+
+    let commLinkData = createCommLink();
+
+    // 通信链路脉冲粒子
+    const pulseGroup = new THREE.Group();
+    scene.add(pulseGroup);
+    const pulseParticles = [];
+    const PULSE_COUNT = 8;
+    for (let i = 0; i < PULSE_COUNT; i++) {
+      const pulseGeo = new THREE.SphereGeometry(0.12, 8, 8);
+      const pulseMat = new THREE.MeshBasicMaterial({
+        color: 0x80deea, transparent: true, opacity: 0.8,
+      });
+      const pulse = new THREE.Mesh(pulseGeo, pulseMat);
+      pulse.userData = { progress: i / PULSE_COUNT, speed: 0.12 + Math.random() * 0.08 };
+      pulseGroup.add(pulse);
+      pulseParticles.push(pulse);
+    }
+
+    /**
+     * 运行 PE 求解器并将结果渲染到热力图平面
+     */
+    const updatePEField = () => {
+      console.log('🔮 重新计算 PE 传播场...');
+      const t0 = performance.now();
+
+      // 2D非均匀折射率提供者
+      if (useInhomogeneous) {
+        inhomogDuct.generateParamSequence(peSolver.NX, peSolver.DX, 3000);
+        peSolver._nSq2DProvider = (ix, z) => {
+          const M = inhomogDuct.modifiedRefractivityAt(ix, z);
+          const n = 1.0 + M * 1e-6;
+          return n * n;
+        };
+      } else {
+        peSolver._nSq2DProvider = null;
+      }
+
+      const fieldDB = peSolver.solve();
+      const texture = peSolver.renderToCanvas(fieldDB);
+
+      // 更新材质纹理
+      if (pePlane.material.map) pePlane.material.map.dispose();
+      pePlane.material.map = texture;
+      pePlane.material.needsUpdate = true;
+
+      const elapsed = (performance.now() - t0).toFixed(0);
+      console.log(`  ✅ PE 计算完成 (${elapsed}ms) — 网格 ${peSolver.NX}×${peSolver.NZ}`);
+    };
+
+    // (PE 初始计算延后到分析工具初始化后 — 避免 TDZ 错误)
+
+    // ============================================================
+    // 9b. 信道建模分析工具
+    // ============================================================
+
+    // --- 9b.1 M剖面图 ---
+    const mprofileCanvas = document.getElementById('mprofile-canvas');
+    const mprofileCtx = mprofileCanvas.getContext('2d');
+
+    const drawMProfile = () => {
+      const W = mprofileCanvas.width, H = mprofileCanvas.height;
+      const ctx = mprofileCtx;
+      ctx.clearRect(0, 0, W, H);
+
+      // 背景
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(0, 0, W, H);
+
+      // 网格
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.lineWidth = 0.5;
+      for (let i = 0; i <= 10; i++) {
+        const y = 10 + (H - 30) * i / 10;
+        ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W - 15, y); ctx.stroke();
+      }
+      for (let i = 0; i <= 6; i++) {
+        const x = 40 + (W - 55) * i / 6;
+        ctx.beginPath(); ctx.moveTo(x, 10); ctx.lineTo(x, H - 25); ctx.stroke();
+      }
+
+      const maxZ = 50;
+      const marginL = 45, marginR = 15, marginT = 12, marginB = 28;
+      const plotW = W - marginL - marginR, plotH = H - marginT - marginB;
+
+      // M剖面曲线
+      const pts = [];
+      for (let iz = 0; iz <= 200; iz++) {
+        const z = (iz / 200) * maxZ;
+        const M = ductModel.modifiedRefractivityProfile(z);
+        pts.push({ z, M });
+      }
+
+      // 找M范围
+      const Mvals = pts.map(p => p.M);
+      const Mmin = Math.floor(Math.min(...Mvals) / 5) * 5;
+      const Mrange = Math.ceil((Math.max(...Mvals) - Mmin) / 10) * 10 + 5;
+
+      // Y轴标签
+      ctx.fillStyle = '#78909c';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'right';
+      for (let z = 0; z <= maxZ; z += 10) {
+        const y = marginT + (1 - z / maxZ) * plotH;
+        ctx.fillText(z + 'm', marginL - 4, y + 3);
+      }
+      // X轴标签
+      ctx.textAlign = 'center';
+      for (let m = Mmin; m <= Mmin + Mrange; m += 5) {
+        const x = marginL + ((m - Mmin) / Mrange) * plotW;
+        ctx.fillText(m, x, H - 4);
+      }
+
+      // 画曲线
+      ctx.strokeStyle = '#ff9800';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        const x = marginL + ((pts[i].M - Mmin) / Mrange) * plotW;
+        const y = marginT + (1 - pts[i].z / maxZ) * plotH;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // 波导高度线
+      if (ductModel.isTrapping && ductModel.ductHeight > 0.5) {
+        const dy = marginT + (1 - ductModel.ductHeight / maxZ) * plotH;
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(marginL, dy); ctx.lineTo(W - marginR, dy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#fff';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`δ=${ductModel.ductHeight.toFixed(1)}m`, W - marginR - 50, dy - 3);
+      }
+
+      // 标题
+      ctx.fillStyle = '#81d4fa';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('M(z) 修正折射率剖面 (M-units)', marginL, 10);
+
+      return { Mmin, Mrange, maxZ, pts };
+    };
+
+    // --- 9b.2 路径损耗 vs 距离图 ---
+    const pathlossCanvas = document.getElementById('pathloss-canvas');
+    const pathlossCtx = pathlossCanvas.getContext('2d');
+
+    const drawPathLossCurves = () => {
+      const W = pathlossCanvas.width, H = pathlossCanvas.height;
+      const ctx = pathlossCtx;
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(0, 0, W, H);
+
+      if (!peSolver.field) return;
+
+      const fieldDB = peSolver.field;
+      const NX = fieldDB.length - 1;
+      const NZ = peSolver.NZ;
+      const DZ = peSolver.DZ;
+      const DX = peSolver.DX;
+
+      const marginL = 45, marginR = 15, marginT = 15, marginB = 28;
+      const plotW = W - marginL - marginR, plotH = H - marginT - marginB;
+
+      // 网格
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 0.5;
+      for (let i = 0; i <= 8; i++) {
+        const y = marginT + plotH * i / 8;
+        ctx.beginPath(); ctx.moveTo(marginL, y); ctx.lineTo(W - marginR, y); ctx.stroke();
+      }
+      for (let i = 0; i <= 8; i++) {
+        const x = marginL + plotW * i / 8;
+        ctx.beginPath(); ctx.moveTo(x, marginT); ctx.lineTo(x, H - marginB); ctx.stroke();
+      }
+
+      // 在多个高度提取PL曲线
+      const heights = [
+        { name: `Tx天线 (${baseStationConfig.txHeight}m)`, iz: Math.floor(baseStationConfig.txHeight / DZ), color: '#4fc3f7', dash: [] },
+        { name: `波导高度 (${ductModel.ductHeight.toFixed(0)}m)`, iz: Math.floor(ductModel.ductHeight / DZ), color: '#ff9800', dash: [4, 2] },
+        { name: `高空 80m`, iz: Math.floor(80 / DZ), color: '#78909c', dash: [2, 3] },
+      ];
+
+      let allPL = [];
+      heights.forEach(h => {
+        if (h.iz < 0 || h.iz >= NZ) return;
+        const curve = [];
+        for (let ix = 0; ix <= NX; ix++) {
+          curve.push({ range: ix * DX, pl: fieldDB[ix][h.iz] });
+          allPL.push(fieldDB[ix][h.iz]);
+        }
+        h.curve = curve;
+      });
+
+      if (allPL.length === 0) return;
+      const plMin = Math.floor(Math.min(...allPL) / 10) * 10;
+      const plMax = Math.ceil(Math.max(...allPL) / 10) * 10;
+      const plRange = plMax - plMin || 40;
+      const maxRange = NX * DX;
+
+      // 轴标签
+      ctx.fillStyle = '#78909c';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'right';
+      for (let pl = plMin; pl <= plMax; pl += plRange / 8) {
+        const y = marginT + ((plMax - pl) / plRange) * plotH;
+        ctx.fillText(pl.toFixed(0), marginL - 4, y + 3);
+      }
+      ctx.textAlign = 'center';
+      for (let r = 0; r <= maxRange; r += 100) {
+        const x = marginL + (r / maxRange) * plotW;
+        ctx.fillText(r + 'm', x, H - 4);
+      }
+
+      // 画曲线
+      heights.forEach(h => {
+        if (!h.curve) return;
+        ctx.strokeStyle = h.color;
+        ctx.lineWidth = h.iz === Math.floor(baseStationConfig.txHeight / DZ) ? 2 : 1.5;
+        ctx.setLineDash(h.dash);
+        ctx.beginPath();
+        for (let i = 0; i < h.curve.length; i++) {
+          const x = marginL + (h.curve[i].range / maxRange) * plotW;
+          const y = marginT + ((plMax - h.curve[i].pl) / plRange) * plotH;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+      });
+
+      // 图例
+      ctx.font = '9px monospace';
+      let legendY = marginT + 4;
+      heights.forEach(h => {
+        if (!h.curve) return;
+        ctx.fillStyle = h.color;
+        ctx.textAlign = 'left';
+        ctx.fillText('— ' + h.name, marginL + 4, legendY);
+        legendY += 14;
+      });
+
+      // 标题
+      ctx.fillStyle = '#81d4fa';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('路径损耗 vs 距离 (PE结果)', marginL, 12);
+    };
+
+    // 初始绘制 (延迟到所有工具初始化完成后执行)
+
+    // --- 9b.3 数据导出 ---
+    const exportChannelData = () => {
+      if (!peSolver.field) {
+        console.log('⚠ PE 数据未就绪, 请先运行求解');
+        return;
+      }
+
+      const fieldDB = peSolver.field;
+      const NX = fieldDB.length - 1;
+      const NZ = peSolver.NZ;
+      const DZ = peSolver.DZ;
+      const DX = peSolver.DX;
+
+      // CSV 格式: range, height, pathloss_dB
+      const rows = ['range_m,height_m,pathloss_dB'];
+      for (let ix = 0; ix <= NX; ix++) {
+        for (let iz = 0; iz < NZ; iz += 8) { // 下采样
+          rows.push(`${(ix * DX).toFixed(1)},${(iz * DZ).toFixed(2)},${fieldDB[ix][iz].toFixed(2)}`);
+        }
+      }
+
+      const csv = rows.join('\n');
+
+      // 导出路径损耗曲线 (特定高度)
+      const curves = {};
+      const exportHeights = [
+        { key: 'tx_height', z: baseStationConfig.txHeight },
+        { key: 'duct_height', z: ductModel.ductHeight },
+        { key: 'sea_surface', z: 2 },
+        { key: 'high_altitude', z: 80 },
+      ];
+      exportHeights.forEach(h => {
+        const iz = Math.floor(h.z / DZ);
+        if (iz < NZ) {
+          curves[h.key] = [];
+          for (let ix = 0; ix <= NX; ix++) {
+            curves[h.key].push({ range_m: +(ix * DX).toFixed(1), pathloss_dB: +fieldDB[ix][iz].toFixed(2) });
+          }
+        }
+      });
+
+      // 环境参数快照
+      const metadata = {
+        timestamp: new Date().toISOString(),
+        frequency_MHz: baseStationConfig.frequency,
+        tx_power_dBm: baseStationConfig.txPower,
+        tx_height_m: baseStationConfig.txHeight,
+        tx_antenna_gain_dBi: baseStationConfig.txAntennaGain,
+        rx_height_m: baseStationConfig.rxHeight,
+        rx_antenna_gain_dBi: baseStationConfig.rxAntennaGain,
+        environment: {
+          air_temp_C: ductModel.airTemp,
+          sea_temp_C: ductModel.seaTemp,
+          rh_pct: ductModel.rh,
+          wind_speed_ms: ductModel.windSpeed,
+          pressure_hPa: ductModel.pressure,
+          ASTD_C: ductModel.astd,
+        },
+        duct: {
+          height_m: ductModel.ductHeight,
+          strength_Munits: ductModel.ductStrength,
+          critical_freq_MHz: ductModel.criticalFreq,
+          is_trapping: ductModel.isTrapping,
+          trapping_gain_dB: ductModel.trappingGain,
+        },
+        pe_grid: {
+          nz: NZ, dz_m: DZ,
+          nx: NX, dx_m: DX,
+          z_max_m: peSolver.ZMAX,
+          r_max_m: peSolver.RMAX,
+        },
+        m_profile: [],
+        pathloss_curves: curves,
+      };
+
+      // M 剖面
+      for (let z = 0; z <= 60; z += 0.5) {
+        metadata.m_profile.push({
+          z_m: +z.toFixed(1),
+          M_units: +ductModel.modifiedRefractivityProfile(z).toFixed(2),
+          N_units: +ductModel.refractivityProfile(z).toFixed(2),
+        });
+      }
+
+      console.log('═══════════════════════════════════');
+      console.log('📦 信道建模数据已导出');
+      console.log('───────────────────────────────────');
+      console.log('metadata:', JSON.stringify(metadata, null, 2));
+      console.log('───────────────────────────────────');
+      console.log('CSV (前20行):');
+      console.log(rows.slice(0, 21).join('\n'));
+      console.log(`... (共 ${rows.length - 1} 行)`);
+      console.log('═══════════════════════════════════');
+
+      // 触发下载
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `channel_data_${ductModel.ductHeight.toFixed(0)}m_duct.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      return metadata;
+    };
+
+    // --- 9b.4 简化射线追踪 (传播时延计算) ---
+    class SimpleRayTracer {
+      constructor(ductModel, config) {
+        this.duct = ductModel;
+        this.config = config;
+      }
+
+      /** 追踪从Tx到Rx的射线, 计算传播时延 */
+      computeDelay(txPos, rxPos) {
+        const dx = rxPos.x - txPos.x;
+        const dz = rxPos.z - txPos.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        const dy = rxPos.y - txPos.y;
+        const distance3D = Math.sqrt(dist * dist + dy * dy);
+
+        const c = 3e8;
+        // 直射路径时延
+        const directDelay = distance3D / c;
+
+        // 海面反射路径
+        const txH = txPos.y;
+        const rxH = rxPos.y;
+        // 镜面反射: 总路径 = sqrt(d² + (ht + hr)²)
+        const reflDist = Math.sqrt(dist * dist + (txH + rxH) * (txH + rxH));
+        const reflDelay = reflDist / c;
+
+        // 在波导内时考虑多跳
+        let ductMultiHopDelay = 0;
+        if (this.duct.isTrapping && this.duct.ductHeight > 0.5) {
+          const ductH = this.duct.ductHeight;
+          // 单跳距离 ≈ 2 * sqrt(2*R_e*ductH)
+          const hopDist = 2 * Math.sqrt(2 * 6371e3 * ductH);
+          const numHops = Math.max(1, Math.floor(dist / hopDist));
+          // 每跳增加路径长度
+          const hopPathLength = dist + numHops * ductH * 0.3;
+          ductMultiHopDelay = hopPathLength / c;
+        }
+
+        const maxDelay = Math.max(directDelay, reflDelay, ductMultiHopDelay);
+        const delay_us = maxDelay * 1e6;
+
+        return {
+          directDelay_us: +(directDelay * 1e6).toFixed(3),
+          reflectedDelay_us: +(reflDelay * 1e6).toFixed(3),
+          ductMultiHopDelay_us: +(ductMultiHopDelay * 1e6).toFixed(3),
+          maxDelay_us: +delay_us.toFixed(3),
+          distance_m: +dist.toFixed(1),
+        };
+      }
+    }
+
+    const rayTracer = new SimpleRayTracer(ductModel, baseStationConfig);
+
+    // --- 9b.5 2D 非均匀折射率场 (一阶马尔可夫链) ---
+    class HorizontallyInhomogeneousDuct {
+      constructor(ductModel) {
+        this.baseDuct = ductModel;
+        // 马尔可夫链参数变化序列
+        this.paramSeq = null;
+        this.nx = 0;
+      }
+
+      /** 生成沿路径变化的气象参数 (一阶马尔可夫链) */
+      generateParamSequence(nSteps, dx, correlationLength) {
+        this.nx = nSteps;
+        const alpha = Math.exp(-dx / correlationLength); // 自相关系数
+
+        const seq = [];
+        // 初始状态 = 当前环境
+        let prevAir = this.baseDuct.airTemp;
+        let prevSea = this.baseDuct.seaTemp;
+        let prevRH = this.baseDuct.rh;
+        let prevWind = this.baseDuct.windSpeed;
+
+        // 变化标准差
+        const stdAir = 0.8, stdSea = 0.3, stdRH = 3, stdWind = 0.8;
+
+        for (let i = 0; i < nSteps; i++) {
+          // 一阶马尔可夫: x_i = α*x_{i-1} + (1-α)*μ + σ*√(1-α²)*ε
+          const air = alpha * prevAir + (1 - alpha) * this.baseDuct.airTemp
+                    + stdAir * Math.sqrt(1 - alpha * alpha) * this._randn();
+          const sea = alpha * prevSea + (1 - alpha) * this.baseDuct.seaTemp
+                    + stdSea * Math.sqrt(1 - alpha * alpha) * this._randn();
+          const rh  = Math.max(40, Math.min(98,
+                    alpha * prevRH + (1 - alpha) * this.baseDuct.rh
+                    + stdRH * Math.sqrt(1 - alpha * alpha) * this._randn()));
+          const wind = Math.max(1, Math.min(20,
+                    alpha * prevWind + (1 - alpha) * this.baseDuct.windSpeed
+                    + stdWind * Math.sqrt(1 - alpha * alpha) * this._randn()));
+
+          prevAir = air; prevSea = sea; prevRH = rh; prevWind = wind;
+          seq.push({ airTemp: air, seaTemp: sea, rh, windSpeed: wind,
+                     pressure: this.baseDuct.pressure,
+                     astd: air - sea });
+        }
+
+        this.paramSeq = seq;
+        return seq;
+      }
+
+      _randn() {
+        // Box-Muller
+        let u = 0, v = 0;
+        while (u === 0) u = Math.random();
+        while (v === 0) v = Math.random();
+        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+      }
+
+      /** 在给定位置计算 M(z) */
+      modifiedRefractivityAt(ix, z) {
+        if (!this.paramSeq || ix >= this.paramSeq.length) {
+          return this.baseDuct.modifiedRefractivityProfile(z);
+        }
+        const p = this.paramSeq[ix];
+        // 使用局部气象参数计算折射率
+        const tempC = p.airTemp;
+        const rh = p.rh;
+        const press = p.pressure;
+        const TK = tempC + 273.15;
+        const e_air = 6.112 * Math.exp((17.67 * tempC) / (tempC + 243.5)) * rh / 100;
+        const N = (77.6 / TK) * (press + (4810 * e_air) / TK);
+        return N + (z / this.baseDuct.R_EARTH) * 1e6;
+      }
+    }
+
+    const inhomogDuct = new HorizontallyInhomogeneousDuct(ductModel);
+    let useInhomogeneous = false;
+
+    // --- 9b.6 更新所有分析图表 ---
+    const updateAnalysisCharts = () => {
+      drawMProfile();
+      drawPathLossCurves();
+
+      // 更新传播时延
+      const txWorld = new THREE.Vector3(0, 17.5, 0);
+      baseStationGroup.localToWorld(txWorld);
+      const rxWorld = new THREE.Vector3();
+      receiverGroup.getWorldPosition(rxWorld);
+      const delayInfo = rayTracer.computeDelay(txWorld, rxWorld);
+      document.getElementById('delay-value').textContent =
+        `${delayInfo.maxDelay_us.toFixed(2)} μs (最大) | ${delayInfo.directDelay_us.toFixed(2)} μs (直射)`;
+      document.getElementById('homog-status').textContent = useInhomogeneous ? '非均匀 (马尔可夫链)' : '均匀';
+      document.getElementById('homog-status').style.color = useInhomogeneous ? '#ff9800' : '#81d4fa';
+    };
+
+    // 所有工具就绪 — 初始 PE 计算 + 图表绘制
+    updatePEField();
+    drawMProfile();
+    drawPathLossCurves();
+
+    // --- 9c. 射线追踪可视化 — 大气波导层陷获/逃逸 ---
+    const rayFanGroup = new THREE.Group();
+    rayFanGroup.name = 'ray-fan';
+    scene.add(rayFanGroup);
+
+    class DuctRayTracer {
+      constructor(ductModel) {
+        this.duct = ductModel;
+        this.VIZ_SCALE = 10000;
+        this.STEP = 2.0;
+        this.MAX_STEPS = 250;
+        this.MAX_HEIGHT = 150;
+      }
+
+      /** 追踪从 Tx 出发的一条射线 — 陷获=海面与波导顶之间振荡 */
+      trace(origin, elevDeg, azimuth) {
+        const points = [origin.clone()];
+        const pos = origin.clone();
+        const er = THREE.MathUtils.degToRad(elevDeg);
+        const dir = new THREE.Vector3(
+          Math.cos(azimuth) * Math.cos(er),
+          Math.sin(er),
+          Math.sin(azimuth) * Math.cos(er)
+        ).normalize();
+
+        let maxH = pos.y;
+        let seaBounces = 0;
+        let totalDist = 0;
+        const ductH = this.duct.ductHeight;
+        const hasDuct = ductH > 0.5;
+
+        for (let s = 0; s < this.MAX_STEPS; s++) {
+          const h = Math.max(0.01, pos.y);
+          const dM = this.duct.dMdz(h);
+
+          // 射线弯曲: d²z/dx² = dM/dz × 10⁻⁶
+          const dTheta = dM * 1e-6 * this.STEP * this.VIZ_SCALE;
+          const hSpeed = Math.sqrt(dir.x * dir.x + dir.z * dir.z);
+          if (hSpeed < 0.0001) break;
+          const theta = Math.atan2(dir.y, hSpeed) + dTheta;
+          dir.y = Math.sin(theta);
+          const nh = Math.cos(theta) / hSpeed;
+          dir.x *= nh; dir.z *= nh;
+          dir.normalize();
+
+          pos.x += dir.x * this.STEP;
+          pos.y += dir.y * this.STEP;
+          pos.z += dir.z * this.STEP;
+          totalDist += this.STEP;
+          points.push(pos.clone());
+          maxH = Math.max(maxH, pos.y);
+
+          // 海面反射 (陷获射线在此反弹, 形成振荡)
+          if (pos.y <= 0.3) {
+            seaBounces++;
+            if (seaBounces >= 20) break; // 太多次振荡 → 停止
+            pos.y = 0.35;
+            dir.y = Math.abs(dir.y) * 0.9; // 反射损失
+            dir.normalize();
+          }
+
+          // 超出波导顶 → 逃逸
+          if (hasDuct && pos.y > ductH * 2.0) break;
+          // 超高空
+          if (pos.y > this.MAX_HEIGHT) break;
+          // 超远距离
+          if (totalDist > 500) break;
+        }
+
+        // 陷获: 最终抵达海面 → 被波导弯下来了
+        // 逃逸: 最终在波导上方 且 仍在上升 → 穿透波导
+        const trapped = hasDuct && pos.y <= 1.0;
+        const escaped = pos.y > ductH && dir.y > 0;
+
+        return { points, trapped, escaped, maxH, seaBounces };
+      }
+    }
+
+    const ductRayTracer = new DuctRayTracer(ductModel);
+
+    // 射线可视化组
+    const trappedRayGroup = new THREE.Group(); trappedRayGroup.name = 'trapped-rays';
+    const escapeRayGroup  = new THREE.Group(); escapeRayGroup.name  = 'escape-rays';
+    rayFanGroup.add(trappedRayGroup);
+    rayFanGroup.add(escapeRayGroup);
+
+    const clearRayFan = () => {
+      [trappedRayGroup, escapeRayGroup].forEach(g => {
+        while (g.children.length) {
+          const c = g.children[0];
+          if (c.geometry) c.geometry.dispose();
+          if (c.material) c.material.dispose();
+          g.remove(c);
+        }
+      });
+    };
+
+    const updateRayFan = () => {
+      clearRayFan();
+
+      // 从基站天线位置发射
+      const origin = new THREE.Vector3(0, 17.5, 0);
+      baseStationGroup.localToWorld(origin);
+
+      // 前方海域方向
+      const azim = Math.PI * 0.35;
+      // 逃逸射线: 大仰角斜向上 → 穿透波导
+      const angles = [50, 55, 60, 65, 70, 75, 80, 85];
+
+      const hasDuct = ductModel.ductHeight > 0.5;
+
+      angles.forEach(elev => {
+        const r = ductRayTracer.trace(origin, elev, azim);
+        if (r.points.length < 3) return;
+
+        let color, opacity;
+        if (!hasDuct) {
+          color = 0x90caf9; opacity = 0.4;
+        } else if (r.trapped) {
+          color = 0xff6d00; opacity = 0.8;  // 🟠 陷获
+        } else {
+          color = 0x00e676; opacity = 0.75; // ⬜ 逃逸
+        }
+
+        if (!r.trapped) {
+          const geo = new THREE.BufferGeometry().setFromPoints(r.points);
+          const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthTest: true });
+          escapeRayGroup.add(new THREE.Line(geo, mat));
+        }
+      });
+
+      // 侧面方向 (展示3D)
+      [Math.PI * 0.15, Math.PI * 0.55].forEach(sideAz => {
+        angles.forEach(elev => {
+          const r = ductRayTracer.trace(origin, elev, sideAz);
+          if (r.points.length < 3 || r.trapped) return;
+          const geo = new THREE.BufferGeometry().setFromPoints(r.points);
+          const mat = new THREE.LineBasicMaterial({ color: 0x00e676, transparent: true, opacity: 0.55, depthTest: true });
+          escapeRayGroup.add(new THREE.Line(geo, mat));
+        });
+      });
+    };
+
+    // 增强波导层可视化 — 三层: 填充面 + 边界环 + 半透明柱壳
+    // 波导高度标签
+    const ductLabelDiv = document.createElement('div');
+    ductLabelDiv.innerHTML = '🌫 波导层顶';
+    ductLabelDiv.style.cssText = 'color:#ff9800;font-size:13px;font-weight:bold;background:rgba(0,0,0,0.8);padding:3px 10px;border-radius:10px;white-space:nowrap;border:1px solid #ff9800;';
+    const ductLabel3D = new CSS2DObject(ductLabelDiv);
+    ductLabel3D.position.set(5, 20, -20);
+    ductLabel3D.name = 'duct-label';
+    scene.add(ductLabel3D);
+
+    // 柱壳
+    const waveGuideShellGeo = new THREE.BoxGeometry(100, 0.5, 100);
+    const waveGuideShellMat = new THREE.MeshBasicMaterial({
+      color: 0xff9800,
+      transparent: true,
+      opacity: 0.15,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const waveGuideShell = new THREE.Mesh(waveGuideShellGeo, waveGuideShellMat);
+    waveGuideShell.position.set(5, 15, 5);
+    waveGuideShell.name = 'duct-shell';
+    rayFanGroup.add(waveGuideShell);
+
+    // 顶部虚线环 (更粗更亮)
+    const ringGeo2 = new THREE.TorusGeometry(45, 0.4, 16, 80);
+    const ringMat2 = new THREE.MeshBasicMaterial({
+      color: 0xff6d00,
+      transparent: true,
+      opacity: 0.6,
+      depthTest: true,
+    });
+    const ductRing3D = new THREE.Mesh(ringGeo2, ringMat2);
+    ductRing3D.rotation.x = -Math.PI / 2;
+    ductRing3D.position.set(5, 15, 5);
+    ductRing3D.name = 'duct-ring-3d';
+    rayFanGroup.add(ductRing3D);
+
+    const updateDuctShell = () => {
+      const hasDuct = ductModel.isTrapping && ductModel.ductHeight > 0.5;
+      const ductY = 0.5 + ductModel.ductHeight;
+
+      // 标签
+      ductLabel3D.visible = hasDuct;
+      ductLabel3D.position.y = ductY + 2;
+      ductLabel3D.position.x = 5;
+      ductLabel3D.position.z = -20;
+      if (hasDuct) {
+        ductLabelDiv.innerHTML = `🌫 波导层顶 δ=${ductModel.ductHeight.toFixed(1)}m`;
+      }
+
+      // 长方体薄层 — 仅标记波导顶高度, 不向上延伸
+      waveGuideShell.visible = hasDuct;
+      waveGuideShell.position.y = ductY;
+      waveGuideShell.scale.y = 1.0; // 保持扁平, 仅在波导顶高度
+
+      // 环
+      ductRing3D.visible = hasDuct;
+      ductRing3D.position.y = ductY;
+
+      // 颜色
+      if (hasDuct) {
+        const inten = Math.min(1, ductModel.ductStrength / 15);
+        const r = 1.0, g = 0.55 + (1 - inten) * 0.3, b = 0.1 + (1 - inten) * 0.2;
+        waveGuideShell.material.opacity = 0.08 + inten * 0.18;
+        waveGuideShell.material.color.setRGB(r, g, b);
+        ringMat2.color.setRGB(r, g * 0.9, b * 0.8);
+        ringMat2.opacity = 0.4 + inten * 0.4;
+      }
+    };
+
+    // 图例标签
+    const legendTrappedDiv = document.createElement('div');
+    legendTrappedDiv.innerHTML = '🟠 陷获射线';
+    legendTrappedDiv.style.cssText = 'color:#ff6d00;font-size:11px;';
+    const legendTrapped = new CSS2DObject(legendTrappedDiv);
+    legendTrapped.position.set(30, 0.5 + ductModel.ductHeight * 0.5, 55);
+    legendTrapped.name = 'legend-trapped';
+    rayFanGroup.add(legendTrapped);
+
+    const legendEscapeDiv = document.createElement('div');
+    legendEscapeDiv.innerHTML = '🔵 逃逸射线';
+    legendEscapeDiv.style.cssText = 'color:#64b5f6;font-size:11px;';
+    const legendEscape = new CSS2DObject(legendEscapeDiv);
+    legendEscape.position.set(30, 0.5 + ductModel.ductHeight * 2.5, 60);
+    legendEscape.name = 'legend-escape';
+    rayFanGroup.add(legendEscape);
+
+    // 初始构建
+    console.log(`🔍 波导状态: δ=${ductModel.ductHeight.toFixed(2)}m, isTrapping=${ductModel.isTrapping}, ΔM=${ductModel.ductStrength.toFixed(1)}`);
+    console.log(`   环境: ASTD=${ductModel.astd.toFixed(1)}°C, q*=${ductModel.getFluxScales().qStar.toFixed(6)}`);
+    updateRayFan();
+    updateDuctShell();
+    updateDuctVisualization();
+
+    // ============================================
+    // 10. 环境细节
+    // ============================================
+    // 远处岩石/礁石
+    const rockGeo = new THREE.IcosahedronGeometry(1, 1);
+    const rockMat = new THREE.MeshStandardMaterial({
+      color: 0x757575,
+      roughness: 0.6,
+      metalness: 0.2,
+    });
+
+    const rockPositions = [
+      [15, -0.2, -4], [28, -0.3, 8], [35, -0.5, 30],
+      [-12, -0.3, -6], [-8, -0.2, -3], [18, -0.4, -7],
+    ];
+
+    rockPositions.forEach(([rx, ry, rz]) => {
+      const rock = new THREE.Mesh(rockGeo, rockMat);
+      rock.position.set(rx, ry, rz);
+      rock.scale.setScalar(0.3 + Math.random() * 0.8);
+      rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+      scene.add(rock);
+    });
+
+    // 陆地树木
+    const createTree = (x, z) => {
+      const treeGroup = new THREE.Group();
+
+      const trunkGeo = new THREE.CylinderGeometry(0.15, 0.22, 2, 8);
+      const trunk = new THREE.Mesh(trunkGeo, new THREE.MeshStandardMaterial({
+        color: 0x5d4037,
+        roughness: 0.8,
+      }));
+      trunk.position.y = 1;
+      trunk.castShadow = true;
+      treeGroup.add(trunk);
+
+      const foliageGeo = new THREE.ConeGeometry(1, 2.5, 8, 4);
+      const foliage = new THREE.Mesh(foliageGeo, new THREE.MeshStandardMaterial({
+        color: 0x388e3c,
+        roughness: 0.7,
+      }));
+      foliage.position.y = 2.8;
+      foliage.castShadow = true;
+      foliage.receiveShadow = true;
+      treeGroup.add(foliage);
+
+      treeGroup.position.set(x, 1.4, z);
+      landGroup.add(treeGroup);
+    };
+
+    createTree(-28, -28);
+    createTree(-30, -14);
+    createTree(-25, -8);
+    createTree(-12, -28);
+    createTree(-8, -30);
+    createTree(-15, -10);
+
+    // 海上浮标
+    const buoyGeo = new THREE.SphereGeometry(0.3, 16, 16);
+    const buoyMat = new THREE.MeshStandardMaterial({
+      color: 0xff5722,
+      roughness: 0.3,
+      metalness: 0.4,
+      emissive: 0xff3d00,
+      emissiveIntensity: 0.5,
+    });
+    const buoy = new THREE.Mesh(buoyGeo, buoyMat);
+    buoy.position.set(35, 1, 15);
+    buoy.castShadow = true;
+    scene.add(buoy);
+
+    const buoy2 = new THREE.Mesh(buoyGeo.clone(), buoyMat);
+    buoy2.position.set(42, 1, 28);
+    buoy2.scale.setScalar(0.8);
+    scene.add(buoy2);
+
+    // 海鸥 (简化抽象)
+    const createSeagull = (x, y, z) => {
+      const group = new THREE.Group();
+      const bodyGeo = new THREE.ConeGeometry(0.15, 0.6, 4);
+      const body = new THREE.Mesh(bodyGeo, new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.3,
+      }));
+      body.rotation.x = Math.PI / 2;
+      group.add(body);
+
+      const wingGeo = new THREE.BoxGeometry(1.5, 0.03, 0.3);
+      const wing = new THREE.Mesh(wingGeo, new THREE.MeshStandardMaterial({
+        color: 0xf5f5f5,
+        roughness: 0.3,
+      }));
+      wing.position.y = 0.05;
+      group.add(wing);
+
+      group.position.set(x, y, z);
+      return group;
+    };
+
+    const seagulls = [];
+    for (let i = 0; i < 6; i++) {
+      const gull = createSeagull(
+        -30 + Math.random() * 80,
+        8 + Math.random() * 20,
+        -30 + Math.random() * 80
+      );
+      gull.userData = {
+        speed: 0.3 + Math.random() * 0.5,
+        radius: 3 + Math.random() * 8,
+        angle: Math.random() * Math.PI * 2,
+        heightOffset: Math.random() * Math.PI * 2,
+      };
+      scene.add(gull);
+      seagulls.push(gull);
+    }
+
+    // ============================================
+    // 11. 动画循环
+    // ============================================
+    const clock = new THREE.Clock();
+
+    function animate(timestamp) {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min(clock.getDelta(), 0.1);
+      const elapsed = timestamp * 0.001;
+
+      controls.update();
+
+      // JS 海面波浪动画
+      const waveFunc = (px, pz, t, amp, freq, speed, dirX, dirZ) => {
+        const dotVal = px * dirX + pz * dirZ;
+        return amp * Math.sin(dotVal * freq + t * speed)
+             * Math.cos(pz * freq * 0.7 + t * speed * 0.6)
+             * Math.sin(px * freq * 0.5 + t * speed * 0.8);
+      };
+      for (let i = 0; i < oceanVertices.count; i++) {
+        const px = oceanVertices.getX(i);
+        const pz = oceanVertices.getZ(i);
+        let h = 0;
+        h += waveFunc(px, pz, elapsed, 0.6, 0.15, 0.8, 0.7, 0.7);
+        h += waveFunc(px, pz, elapsed, 0.4, 0.25, 1.1, -0.5, 0.8);
+        h += waveFunc(px, pz, elapsed, 0.2, 0.5, 1.5, 0.3, -0.9);
+        const shoreDist = pz + oceanSize * 0.5;
+        const shoreFade = shoreDist < 8 ? Math.max(0, shoreDist / 8) : 1;
+        oceanVertices.setY(i, oceanBaseY[i] + h * shoreFade * 0.8);
+      }
+      oceanGeo.attributes.position.needsUpdate = true;
+      oceanGeo.computeVertexNormals();
+
+      // 船只随波浪浮动
+      const boatWorldX = boatGroup.position.x;
+      const boatWorldZ = boatGroup.position.z;
+
+      // 采样波浪高度 (与 shader 中的 wave 函数一致)
+      const sampleWaveHeight = (px, pz) => {
+        const t = elapsed;
+        let h = 0;
+        const wave = (p, t_, amp, freq, speed, dirX, dirZ) => {
+          const dotVal = p[0] * dirX + p[1] * dirZ;
+          return amp * Math.sin(dotVal * freq + t_ * speed) *
+                       Math.cos(p[1] * freq * 0.7 + t_ * speed * 0.6) *
+                       Math.sin(p[0] * freq * 0.5 + t_ * speed * 0.8);
+        };
+        h += wave([px, pz], t, 1.8, 0.15, 0.8, 0.7, 0.7);
+        h += wave([px, pz], t, 1.2, 0.25, 1.1, -0.5, 0.8);
+        h += wave([px, pz], t, 0.6, 0.5, 1.5, 0.3, -0.9);
+        h += wave([px, pz], t * 1.3, 0.35, 0.8, 2.0, -0.9, -0.3);
+        h += wave([px, pz], t * 0.9, 0.8, 0.35, 1.3, 0.6, -0.5);
+        h += wave([px, pz], t * 1.2, 0.4, 0.6, 1.7, 0.1, 1.0);
+
+        const shoreDist = pz + 60;
+        const shoreFade = shoreDist < 8 ? Math.max(0, shoreDist / 8) : 1;
+        return h * 1.2 * shoreFade;
+      };
+
+      // 更新船只位置和旋转
+      const waveH = sampleWaveHeight(boatWorldX - 5, boatWorldZ - 5); // ocean position offset
+      boatGroup.position.y = 1.2 + waveH;
+
+      // 船体随波浪倾斜
+      const eps = 1.0;
+      const hL = sampleWaveHeight(boatWorldX - 5 - eps, boatWorldZ - 5);
+      const hR = sampleWaveHeight(boatWorldX - 5 + eps, boatWorldZ - 5);
+      const hF = sampleWaveHeight(boatWorldX - 5, boatWorldZ - 5 - eps);
+      const hB = sampleWaveHeight(boatWorldX - 5, boatWorldZ - 5 + eps);
+
+      boatGroup.rotation.z = Math.atan2(hR - hL, eps * 2) * 0.7;
+      boatGroup.rotation.x = Math.atan2(hF - hB, eps * 2) * 0.7;
+
+      // 船只缓慢漂移
+      boatGroup.position.x += Math.sin(elapsed * 0.3) * 0.03;
+      boatGroup.position.z += Math.cos(elapsed * 0.25) * 0.03;
+
+      // 浮标随浪浮动
+      buoy.position.y = 1 + sampleWaveHeight(35 - 5, 15 - 5);
+      buoy2.position.y = 1 + sampleWaveHeight(42 - 5, 28 - 5);
+
+      // 更新通信链路 (每0.5秒)
+      if (Math.floor(elapsed * 2) !== Math.floor((elapsed - dt) * 2)) {
+        commLinkData = createCommLink();
+      }
+
+      // 更新信号脉冲沿通信链路运动
+      pulseParticles.forEach(pulse => {
+        pulse.userData.progress += pulse.userData.speed * dt;
+        if (pulse.userData.progress > 1) pulse.userData.progress -= 1;
+
+        const t = pulse.userData.progress;
+        if (commLinkData.points && commLinkData.points.length > 1) {
+          // 沿实际射线路径插值
+          const totalLen = commLinkData.distance;
+          const targetDist = t * totalLen;
+          let accDist = 0;
+          let pt = commLinkData.points[0];
+          for (let i = 1; i < commLinkData.points.length; i++) {
+            const segLen = commLinkData.points[i - 1].distanceTo(commLinkData.points[i]);
+            if (accDist + segLen >= targetDist) {
+              const segT = (targetDist - accDist) / Math.max(segLen, 0.001);
+              pt = new THREE.Vector3().lerpVectors(
+                commLinkData.points[i - 1], commLinkData.points[i], segT
+              );
+              break;
+            }
+            accDist += segLen;
+            pt = commLinkData.points[i];
+          }
+          pulse.position.copy(pt);
+          pulse.material.opacity = 0.3 + Math.sin(t * Math.PI) * 0.5;
+        }
+      });
+
+      // 海鸥动画
+      seagulls.forEach(gull => {
+        gull.userData.angle += gull.userData.speed * dt;
+        gull.position.x += Math.cos(gull.userData.angle) * gull.userData.speed * dt;
+        gull.position.z += Math.sin(gull.userData.angle) * gull.userData.speed * dt;
+        gull.position.y += Math.sin(elapsed * 2 + gull.userData.heightOffset) * 0.03;
+        gull.rotation.y = -gull.userData.angle + Math.PI / 2;
+      });
+
+      // 信标闪烁
+      const beaconIntensity = 1.5 + Math.sin(elapsed * 4) * 0.8;
+      beaconMat.emissiveIntensity = beaconIntensity;
+      rxLightMat.emissiveIntensity = 1.2 + Math.sin(elapsed * 3 + 1) * 0.6;
+
+      // 更新 UI — 信号指标
+      const basePosWorld = new THREE.Vector3();
+      baseStationGroup.getWorldPosition(basePosWorld);
+      const dist3D = basePosWorld.distanceTo(boatGroup.position);
+
+      // 每2秒微调环境参数 (模拟气象变化)
+      if (Math.floor(elapsed * 0.5) !== Math.floor((elapsed - dt) * 0.5)) {
+        // ASTD 微调 → 影响波导
+        const astdDrift = (Math.sin(elapsed * 0.1) * 0.3 + (Math.random() - 0.5) * 0.4) * dt;
+        const newSeaTemp = ductModel.seaTemp + astdDrift * 0.5;
+        const newAirTemp = ductModel.airTemp + astdDrift * 0.3;
+        const newRH = Math.max(50, Math.min(95, ductModel.rh + (Math.random() - 0.5) * 0.8));
+        const newWind = Math.max(2, Math.min(15, ductModel.windSpeed + (Math.random() - 0.5) * 0.5));
+
+        ductModel.setEnvironment({
+          airTemp: newAirTemp,
+          seaTemp: newSeaTemp,
+          rh: newRH,
+          windSpeed: newWind,
+        });
+
+        // 更新波导可视化
+        updateDuctVisualization();
+        updateDuctShell();
+        updatePEField();
+        updateRayFan();
+        updateAnalysisCharts();
+      }
+
+      // 计算实际场景距离 (坐标系单位 ≈ 米)
+      const signalResult = propagationModel.computeSignal(dist3D, dt);
+
+      // 信号强度分级
+      let signalLevel, signalClass;
+      if (signalResult.rsrp >= -80)       { signalLevel = 'good'; signalClass = 'active'; }
+      else if (signalResult.rsrp >= -100) { signalLevel = 'warn'; signalClass = 'low'; }
+      else                                { signalLevel = 'bad';  signalClass = 'lost'; }
+
+      // 更新信号显示
+      document.getElementById('rsrp-value').textContent = `${signalResult.rsrp.toFixed(1)} dBm`;
+      document.getElementById('rsrp-value').className = `metric-value ${signalLevel}`;
+      document.getElementById('sinr-value').textContent = `${signalResult.sinr.toFixed(1)} dB`;
+      document.getElementById('sinr-value').className = `metric-value ${signalLevel}`;
+      document.getElementById('rsrq-value').textContent = `${signalResult.rsrq.toFixed(1)} dB`;
+      document.getElementById('rsrq-value').className = `metric-value ${signalLevel}`;
+      document.getElementById('pathloss-value').textContent = `${signalResult.pathLoss.toFixed(0)} dB`;
+      document.getElementById('distance-value').textContent = `${Math.round(signalResult.distance)} m`;
+      document.getElementById('model-value').textContent = signalResult.modelName;
+      document.getElementById('wave-height-value').textContent =
+        `${Math.abs(sampleWaveHeight(boatWorldX - 5, boatWorldZ - 5)).toFixed(1)} m`;
+
+      // 信号强度条形图
+      const signalPercent = Math.max(0, Math.min(100, (signalResult.rsrp + 120) / 60 * 100));
+      const bar = document.getElementById('signal-bar');
+      bar.style.width = signalPercent + '%';
+      if (signalLevel === 'good')      bar.style.background = '#4caf50';
+      else if (signalLevel === 'warn') bar.style.background = '#ff9800';
+      else                             bar.style.background = '#f44336';
+
+      // 链路状态
+      const statusDot = document.getElementById('link-status-dot');
+      const statusText = document.getElementById('link-status-text');
+      statusDot.className = 'status-dot ' + signalClass;
+      if (signalLevel === 'good')      statusText.textContent = '链路正常 — 信号优良';
+      else if (signalLevel === 'warn') statusText.textContent = '链路警告 — 信号减弱';
+      else                             statusText.textContent = '链路危险 — 接近失联';
+
+      // 通信链路随信号强度变色
+      const signalStrengthNorm = Math.max(0, Math.min(1, (signalResult.rsrp + 120) / 55));
+      commLinkGroup.children.forEach(child => {
+        if (child.material && child.material.isLineBasicMaterial) {
+          const r = 0.2 + (1 - signalStrengthNorm) * 2.5;
+          const g = 0.5 + signalStrengthNorm * 1.5;
+          const b = 0.6 + signalStrengthNorm * 1.5;
+          child.material.color.setRGB(
+            Math.min(1, r), Math.min(1, g), Math.min(1, b)
+          );
+          child.material.opacity = 0.3 + signalStrengthNorm * 0.5;
+        }
+      });
+
+      // 脉冲粒子随信号强度变色
+      pulseParticles.forEach(pulse => {
+        if (signalLevel === 'good')      pulse.material.color.setHex(0x80deea);
+        else if (signalLevel === 'warn') pulse.material.color.setHex(0xffcc02);
+        else                             pulse.material.color.setHex(0xff5252);
+      });
+
+      // 每当波导状态显著变化时重新运行 PE
+      const prevDuctH = pePlane.userData?.lastDuctH || 0;
+      if (Math.abs(ductModel.ductHeight - prevDuctH) > 0.3) {
+        updatePEField();
+        if (!pePlane.userData) pePlane.userData = {};
+        pePlane.userData.lastDuctH = ductModel.ductHeight;
+      }
+
+      // ---- 更新蒸发波导 UI ----
+      document.getElementById('duct-height').textContent =
+        ductModel.ductHeight > 0.01 ? `${ductModel.ductHeight.toFixed(1)} m` : '无';
+      document.getElementById('duct-strength').textContent =
+        ductModel.ductHeight > 0.01 ? `${ductModel.ductStrength.toFixed(1)} M-units` : '—';
+      document.getElementById('duct-gain').textContent =
+        `${signalResult.ductGain.toFixed(1)} dB`;
+      document.getElementById('duct-freq').textContent =
+        ductModel.isTrapping ? `${ductModel.criticalFreq.toFixed(0)} MHz` : '—';
+
+      const trappingEl = document.getElementById('duct-trapping');
+      if (ductModel.isTrapping && signalResult.ductGain > 0.5) {
+        const fRatio = baseStationConfig.frequency / ductModel.criticalFreq;
+        if (fRatio <= 1.0) {
+          trappingEl.textContent = '🟢 全陷获';
+          trappingEl.style.color = '#4caf50';
+        } else if (fRatio <= 2.0) {
+          trappingEl.textContent = '🟡 部分陷获';
+          trappingEl.style.color = '#ff9800';
+        } else {
+          trappingEl.textContent = '🔵 弱陷获';
+          trappingEl.style.color = '#64b5f6';
+        }
+      } else if (ductModel.isTrapping) {
+        trappingEl.textContent = '⚪ 天线未在波导内';
+        trappingEl.style.color = '#9e9e9e';
+      } else {
+        trappingEl.textContent = '⚫ 无波导';
+        trappingEl.style.color = '#616161';
+      }
+
+      // ---- 更新环境参数 UI ----
+      document.getElementById('env-tair').textContent = `${ductModel.airTemp.toFixed(1)} °C`;
+      document.getElementById('env-tsea').textContent = `${ductModel.seaTemp.toFixed(1)} °C`;
+      document.getElementById('env-rh').textContent = `${ductModel.rh.toFixed(0)} %`;
+      document.getElementById('env-wind').textContent = `${ductModel.windSpeed.toFixed(1)} m/s`;
+      document.getElementById('env-pres').textContent = `${ductModel.pressure.toFixed(0)} hPa`;
+      document.getElementById('env-astd').textContent = `${ductModel.astd.toFixed(1)} °C`;
+      const astdEl = document.getElementById('env-astd');
+      astdEl.style.color = ductModel.astd < -1.5 ? '#ff9800' : ductModel.astd > 1.5 ? '#4fc3f7' : '#e0e0e0';
+
+      // 渲染
+      renderer.render(scene, camera);
+      labelRenderer.render(scene, camera);
+    }
+
+    // ============================================
+    // 12. 响应式处理
+    // ============================================
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // 键盘控制
+    window.addEventListener('keydown', (e) => {
+      const speed = 1.5;
+      switch (e.key.toLowerCase()) {
+        case 'w':
+          boatGroup.position.z -= speed;
+          break;
+        case 's':
+          boatGroup.position.z += speed;
+          break;
+        case 'a':
+          boatGroup.position.x -= speed;
+          break;
+        case 'd':
+          boatGroup.position.x += speed;
+          break;
+        case 'r':
+          camera.position.set(60, 35, 80);
+          controls.target.set(0, 3, -10);
+          controls.update();
+          break;
+        case 'f':
+          controls.target.copy(boatGroup.position);
+          controls.update();
+          break;
+        // ---- 环境参数控制 ----
+        case '1':
+          ductModel.setEnvironment({ airTemp: 26, seaTemp: 28, rh: 88, windSpeed: 3 });
+          updateDuctVisualization();
+          updateDuctShell();
+          updatePEField();
+          updateRayFan();
+          updateAnalysisCharts();
+          console.log('🌫 强蒸发波导 (ASTD=-2°C, RH=88%, U=3m/s)');
+          break;
+        case '2':
+          ductModel.setEnvironment({ airTemp: 28, seaTemp: 25, rh: 75, windSpeed: 6 });
+          updateDuctVisualization();
+          updateDuctShell();
+          updatePEField();
+          updateRayFan();
+          updateAnalysisCharts();
+          console.log('🌤 典型海域 (ASTD=+3°C, RH=75%, U=6m/s)');
+          break;
+        case '3':
+          ductModel.setEnvironment({ airTemp: 30, seaTemp: 24, rh: 50, windSpeed: 14 });
+          updateDuctVisualization();
+          updateDuctShell();
+          updatePEField();
+          updateRayFan();
+          updateAnalysisCharts();
+          console.log('💨 无波导 — 强风干燥 (ASTD=+6°C, RH=50%, U=14m/s)');
+          break;
+        case '4':
+          ductModel.setEnvironment({ airTemp: 22, seaTemp: 29, rh: 95, windSpeed: 2 });
+          updateDuctVisualization();
+          updateDuctShell();
+          updatePEField();
+          updateRayFan();
+          updateAnalysisCharts();
+          console.log('🌊 极端蒸发波导 (ASTD=-7°C, RH=95%, U=2m/s)');
+          break;
+        case '5':
+          ductModel.setEnvironment({ airTemp: 25, seaTemp: 25, rh: 60, windSpeed: 10 });
+          updateDuctVisualization();
+          updateDuctShell();
+          updatePEField();
+          updateRayFan();
+          updateAnalysisCharts();
+          console.log('☁ 中性大气 (ASTD=0°C) — 标准传播');
+          break;
+        // ---- 数据操作 ----
+        case 'e':
+          // 导出信道数据
+          exportChannelData();
+          break;
+        case 'h':
+          // 切换均匀/非均匀波导
+          useInhomogeneous = !useInhomogeneous;
+          if (useInhomogeneous) {
+            inhomogDuct.generateParamSequence(peSolver.NX, peSolver.DX, 3000);
+            console.log('🌐 切换到水平非均匀波导 (马尔可夫链, 相关长度=3km)');
+          } else {
+            console.log('🌐 切换到水平均匀波导');
+          }
+          updateDuctShell();
+          updatePEField();
+          updateRayFan();
+          updateAnalysisCharts();
+          updateDuctVisualization();
+          break;
+        case 'c':
+          // 对比模式: 临时关闭波导效果
+          {
+            const origEnv = {
+              airTemp: ductModel.airTemp,
+              seaTemp: ductModel.seaTemp,
+              rh: ductModel.rh,
+              windSpeed: ductModel.windSpeed,
+            };
+            // 强制无波导
+            ductModel.setEnvironment({ airTemp: 30, seaTemp: 24, rh: 50, windSpeed: 14 });
+            updateDuctVisualization();
+            updateDuctShell();
+            updatePEField();
+            updateRayFan();
+            updateAnalysisCharts();
+            console.log('📊 对比模式: 强制无波导条件');
+            // 3秒后恢复
+            setTimeout(() => {
+              ductModel.setEnvironment(origEnv);
+              updateDuctVisualization();
+              updateDuctShell();
+              updatePEField();
+              updateRayFan();
+              updateAnalysisCharts();
+              console.log('📊 已恢复原始波导条件');
+            }, 3000);
+          }
+          break;
+      }
+    });
+
+    // 启动
+    requestAnimationFrame(animate);
+
+    console.log('🌊 海陆通信场景 + PE 信道建模已就绪');
+    console.log('  📡 基站 — 陆地上  |  🚢 接收机 — 海洋探测船');
+    console.log('  🖱 鼠标拖拽旋转 | 滚轮缩放 | 右键平移');
+    console.log('  ⌨ WASD 移动船只 | R 重置视角 | F 聚焦船只');
+    console.log('────────────────────────────────────────');
+    console.log('  🌫 环境预设:  1强波导  2典型海域  3无波导  4极端  5中性');
+    console.log('  📊 数据操作:  E导出CSV  H切换非均匀波导  C有/无对比');
+    console.log('  🔮 算法: Split-Step Fourier PE (512×250)');
+    console.log('  📈 左下角: M剖面图 + 路径损耗曲线');
+  </script>
+</body>
+</html>
