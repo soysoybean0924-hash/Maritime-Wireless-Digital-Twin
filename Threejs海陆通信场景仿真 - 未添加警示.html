@@ -2861,7 +2861,7 @@
         const dirZ = Math.sin(azimuth);
         const ductTopY = SEA_LEVEL + ductModel.ductHeight;
         const escapeBaseY = Math.max(txOrigin.y, ductTopY + 1.4);
-        const rangeMax = 44 + elev * 0.48;
+        const rangeMax = 54 + elev * 0.58;
         const nearDuctSag = Math.max(0, 8 - elev * 0.08);
         const escapeLift = 7 + elev * 0.18;
         for (let i = 0; i <= 72; i++) {
@@ -2930,12 +2930,12 @@
         }
       });
 
-      // 紧凑绿色非陷获射线族：角度更密、扇面更窄，避免覆盖整片画面
-      [8, 10, 12, 14, 16, 18, 20, 23, 26, 30, 34, 38, 42].forEach((elev, idx) => {
-        const spread = (idx - 6) * 0.008;
-        const opacity = 0.6 + Math.min(idx, 6) * 0.018;
+      // 适度展开的绿色非陷获射线族：位于波导层以上，扇面比紧凑版更开阔
+      [8, 11, 14, 17, 20, 24, 28, 33, 39, 46, 54, 63].forEach((elev, idx) => {
+        const spread = (idx - 5.5) * 0.015;
+        const opacity = 0.58 + Math.min(idx, 6) * 0.016;
         const color = elev < 20 ? 0x00ff66 : elev < 45 ? 0x35f6b0 : 0x8dfdd1;
-        addEscapeCurve(elev, azim + spread, opacity, 0.028, color);
+        addEscapeCurve(elev, azim + spread, opacity, 0.026, color);
       });
     };
 
