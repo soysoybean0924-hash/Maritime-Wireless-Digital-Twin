@@ -229,6 +229,38 @@
     #env-panel .env-label { color: #90a4ae; }
     #env-panel .env-value { color: #e0e0e0; font-family: 'Consolas', monospace; }
 
+    #python-twin-panel {
+      position: absolute;
+      bottom: 72px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.72);
+      color: #fff;
+      padding: 12px 15px;
+      border-radius: 12px;
+      border: 1px solid rgba(129, 212, 250, 0.22);
+      pointer-events: none;
+      backdrop-filter: blur(10px);
+      font-size: 11px;
+      min-width: 230px;
+      z-index: 3;
+    }
+    #python-twin-panel h3 {
+      font-size: 12px;
+      color: #81d4fa;
+      margin: 0 0 5px 0;
+    }
+    #python-twin-panel .python-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 1px 0;
+    }
+    #python-twin-panel .python-label { color: #90a4ae; }
+    #python-twin-panel .python-value { color: #e0e0e0; font-family: 'Consolas', monospace; }
+    #python-twin-status.online { color: #4caf50; }
+    #python-twin-status.pending { color: #ffcc80; }
+    #python-twin-status.offline { color: #ef9a9a; }
+
     /* 信道分析面板 */
     #analysis-panel {
       margin-top: 18px;
@@ -499,6 +531,15 @@
     <div class="env-row"><span class="env-label">风速 (U)</span><span class="env-value" id="env-wind">6 m/s</span></div>
     <div class="env-row"><span class="env-label">大气压 (P)</span><span class="env-value" id="env-pres">1013 hPa</span></div>
     <div class="env-row"><span class="env-label">ASTD</span><span class="env-value" id="env-astd">-3.0 °C</span></div>
+  </div>
+
+  <div id="python-twin-panel">
+    <h3>Python 信道预测</h3>
+    <div class="python-row"><span class="python-label">接口状态</span><span class="python-value offline" id="python-twin-status">未连接</span></div>
+    <div class="python-row"><span class="python-label">路径损耗</span><span class="python-value" id="python-pathloss">-- dB</span></div>
+    <div class="python-row"><span class="python-label">传播时延</span><span class="python-value" id="python-delay">-- μs</span></div>
+    <div class="python-row"><span class="python-label">波导高度</span><span class="python-value" id="python-duct-height">-- m</span></div>
+    <div class="python-row"><span class="python-label">推理耗时</span><span class="python-value" id="python-inference">-- ms</span></div>
   </div>
   </div>
 
@@ -2647,6 +2688,90 @@
 
     let commLinkData = createCommLink();
 
+    const pythonTwin = {
+      endpoint: 'http://127.0.0.1:8000/api/channel/predict',
+      pending: false,
+      debounceTimer: null,
+      lastAutoRequestAt: 0,
+    };
+
+    const setPythonTwinStatus = (text, state = 'offline') => {
+      const el = document.getElementById('python-twin-status');
+      el.textContent = text;
+      el.className = `python-value ${state}`;
+    };
+
+    const updatePythonTwinPanel = (prediction) => {
+      document.getElementById('python-pathloss').textContent = `${prediction.pathLossDb.toFixed(2)} dB`;
+      document.getElementById('python-delay').textContent = `${prediction.delayUs.toFixed(2)} μs`;
+      document.getElementById('python-duct-height').textContent = `${prediction.ductHeightM.toFixed(1)} m`;
+      document.getElementById('python-inference').textContent = `${prediction.inferenceMs.toFixed(2)} ms`;
+      setPythonTwinStatus('已连接', 'online');
+    };
+
+    const collectPythonTwinPayload = () => {
+      const baseWorld = new THREE.Vector3();
+      const boatWorld = new THREE.Vector3();
+      const txWorld = new THREE.Vector3(txAntennaLocalX, txAntennaLocalY, txAntennaLocalZ);
+      const rxWorld = new THREE.Vector3();
+      baseStationGroup.getWorldPosition(baseWorld);
+      boatGroup.getWorldPosition(boatWorld);
+      baseStationGroup.localToWorld(txWorld);
+      receiverGroup.getWorldPosition(rxWorld);
+
+      return {
+        airTemp: ductModel.airTemp,
+        seaTemp: ductModel.seaTemp,
+        rh: ductModel.rh,
+        windSpeed: ductModel.windSpeed,
+        pressure: ductModel.pressure,
+        frequency: baseStationConfig.frequency,
+        txPower: baseStationConfig.txPower,
+        txAntennaGain: baseStationConfig.txAntennaGain,
+        rxAntennaGain: baseStationConfig.rxAntennaGain,
+        txCableLoss: baseStationConfig.txCableLoss,
+        rxCableLoss: baseStationConfig.rxCableLoss,
+        txHeight: baseStationConfig.txHeight,
+        rxHeight: baseStationConfig.rxHeight,
+        ductHeight: ductModel.ductHeight,
+        basePosition: { x: baseWorld.x, y: baseWorld.y, z: baseWorld.z },
+        boatPosition: { x: boatWorld.x, y: boatWorld.y, z: boatWorld.z },
+        txPosition: { x: txWorld.x, y: txWorld.y, z: txWorld.z },
+        rxPosition: { x: rxWorld.x, y: rxWorld.y, z: rxWorld.z },
+        useInhomogeneous,
+      };
+    };
+
+    const requestPythonTwinPrediction = async () => {
+      if (pythonTwin.pending || typeof fetch !== 'function') return;
+      pythonTwin.pending = true;
+      setPythonTwinStatus('计算中', 'pending');
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 1200);
+      try {
+        const response = await fetch(pythonTwin.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(collectPythonTwinPayload()),
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (!data.ok || !data.prediction) throw new Error(data.error || 'Invalid response');
+        updatePythonTwinPanel(data.prediction);
+      } catch (error) {
+        setPythonTwinStatus('离线', 'offline');
+      } finally {
+        window.clearTimeout(timeoutId);
+        pythonTwin.pending = false;
+      }
+    };
+
+    const schedulePythonTwinPrediction = (delay = 260) => {
+      window.clearTimeout(pythonTwin.debounceTimer);
+      pythonTwin.debounceTimer = window.setTimeout(requestPythonTwinPrediction, delay);
+    };
+
     // 通信链路脉冲粒子
     const pulseGroup = new THREE.Group();
     scene.add(pulseGroup);
@@ -3553,6 +3678,7 @@
       updateAnalysisCharts();
       if (recomputePE) updatePEField();
       syncControlOutputs();
+      schedulePythonTwinPrediction();
     };
 
     const scheduleSimulationRefresh = () => {
@@ -3678,6 +3804,7 @@
     };
 
     initializeTuningControls();
+    schedulePythonTwinPrediction(500);
 
     // ============================================
     // 10. 环境细节
@@ -4058,6 +4185,11 @@
       if (Math.floor(elapsed * 2) !== Math.floor((elapsed - dt) * 2)) {
         commLinkData = createCommLink();
         updateRayFan();
+      }
+
+      if (elapsed - pythonTwin.lastAutoRequestAt > 1.5) {
+        pythonTwin.lastAutoRequestAt = elapsed;
+        schedulePythonTwinPrediction(0);
       }
 
       // 更新信号脉冲沿通信链路运动
