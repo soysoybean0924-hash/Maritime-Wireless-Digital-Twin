@@ -2398,11 +2398,11 @@
         points.push(new THREE.Vector3(x, y, z));
       }
       const curve = new THREE.CatmullRomCurve3(points);
-      const geo = new THREE.TubeGeometry(curve, 36, 0.055, 6, false);
+      const geo = new THREE.TubeGeometry(curve, 36, 0.038, 6, false);
       const mat = new THREE.MeshBasicMaterial({
         color: 0xffd54f,
         transparent: true,
-        opacity: 0.72,
+        opacity: 0.36,
         depthTest: true,
       });
       const mesh = new THREE.Mesh(geo, mat);
@@ -3436,14 +3436,13 @@
         escapeRayGroup.add(new THREE.Mesh(geo, mat));
       };
 
-      const createTrappedCurvePoints = (txOrigin, rxTarget, laneOffset = 0) => {
+      const createMainTrappedLinkPoints = (txOrigin, rxTarget) => {
         const pts = [];
         const forward = rxTarget.clone().sub(txOrigin);
         forward.y = 0;
         if (forward.lengthSq() < 0.001) forward.set(1, 0, 0);
         forward.normalize();
-        const side = new THREE.Vector3(-forward.z, 0, forward.x);
-        const end = rxTarget.clone().add(side.clone().multiplyScalar(laneOffset * 0.28));
+        const end = rxTarget.clone();
         end.y = THREE.MathUtils.clamp(rxTarget.y + 0.5, SEA_LEVEL + 0.8, Math.max(SEA_LEVEL + 1.2, ductCeiling));
         const startY = Math.min(txOrigin.y, Math.max(SEA_LEVEL + 2.2, ductCeiling - 1.2));
         const endY = end.y;
@@ -3451,17 +3450,18 @@
         for (let i = 0; i <= 96; i++) {
           const t = i / 96;
           const base = new THREE.Vector3().lerpVectors(txOrigin, end, t);
-          const lateral = Math.sin(t * Math.PI) * laneOffset;
           const settle = THREE.MathUtils.smoothstep(t, 0, 1);
           const yBase = THREE.MathUtils.lerp(startY, endY, settle);
-          const yWave = Math.sin(t * Math.PI * 4.6 + laneOffset * 0.25) * waveAmp;
+          const yWave = Math.sin(t * Math.PI * 4.6) * waveAmp;
           const y = THREE.MathUtils.clamp(yBase + yWave, SEA_LEVEL + 0.45, Math.max(SEA_LEVEL + 1.0, ductCeiling));
           pts.push(new THREE.Vector3(
-            base.x + side.x * lateral,
+            base.x,
             y,
-            base.z + side.z * lateral
+            base.z
           ));
         }
+        pts[0].copy(txOrigin);
+        pts[pts.length - 1].copy(end);
         return pts;
       };
 
@@ -3474,21 +3474,20 @@
       }
 
       const hasDuct = ductModel.ductHeight > 0.5;
-      const trappedOffsets = [-5.4, -3.1, -1.2, 1.2, 3.1, 5.4];
 
       if (hasDuct) {
-        trappedOffsets.forEach((offset, index) => {
-          const trappedPts = createTrappedCurvePoints(origin, receiverTarget, offset);
-          const curve = new THREE.CatmullRomCurve3(trappedPts);
-          const geo = new THREE.TubeGeometry(curve, 128, 0.075 + (index % 2) * 0.012, 7, false);
-          const mat = new THREE.MeshBasicMaterial({
-            color: 0xff8f00,
-            transparent: true,
-            opacity: rayOpacity.trapped,
-            depthTest: false,
-          });
-          trappedRayGroup.add(new THREE.Mesh(geo, mat));
+        const trappedPts = createMainTrappedLinkPoints(origin, receiverTarget);
+        const curve = new THREE.CatmullRomCurve3(trappedPts);
+        const geo = new THREE.TubeGeometry(curve, 144, 0.12, 8, false);
+        const mat = new THREE.MeshBasicMaterial({
+          color: 0xff8f00,
+          transparent: true,
+          opacity: rayOpacity.trapped,
+          depthTest: false,
         });
+        const mainTrappedLink = new THREE.Mesh(geo, mat);
+        mainTrappedLink.name = 'main-trapped-link';
+        trappedRayGroup.add(mainTrappedLink);
       }
 
       azAngles.forEach(azim => {
