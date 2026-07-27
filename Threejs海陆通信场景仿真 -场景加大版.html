@@ -554,6 +554,8 @@
           <label class="toggle-row"><span>按气象自动计算</span><input id="ctrl-duct-auto" type="checkbox" checked></label>
           <label class="control-row"><span>手动波导高度</span><input id="ctrl-duct-height" type="range" min="0" max="35" step="0.5" value="12"><output id="out-duct-height">自动</output></label>
           <label class="control-row"><span>显示透明度</span><input id="ctrl-duct-opacity" type="range" min="0" max="0.35" step="0.01" value="0.08"><output id="out-duct-opacity">0.08</output></label>
+          <label class="control-row"><span>陷获射线透明度</span><input id="ctrl-trapped-ray-opacity" type="range" min="0.25" max="1" step="0.01" value="0.95"><output id="out-trapped-ray-opacity">0.95</output></label>
+          <label class="control-row"><span>逃逸射线透明度</span><input id="ctrl-escape-ray-opacity" type="range" min="0.2" max="1" step="0.01" value="0.7"><output id="out-escape-ray-opacity">0.70</output></label>
           <label class="toggle-row"><span>水平非均匀波导</span><input id="ctrl-inhomogeneous" type="checkbox"></label>
           <button class="action-button" id="ctrl-recompute" type="button">重新计算信道</button>
         </div>
@@ -595,6 +597,8 @@
       ductAuto: true,
       ductHeightManual: 12,
       ductOpacity: 0.08,
+      trappedRayOpacity: 0.95,
+      escapeRayOpacity: 0.7,
       waveHeightScale: 1,
       waveSpeedScale: 1,
       boatRollScale: 0.7,
@@ -2061,7 +2065,7 @@
     baseLabelDiv.textContent = '📡 基站';
     baseLabelDiv.style.cssText = 'color:#fff;font-size:14px;font-weight:bold;background:rgba(0,0,0,0.7);padding:4px 10px;border-radius:12px;white-space:nowrap;';
     const baseLabel = new CSS2DObject(baseLabelDiv);
-    baseLabel.position.set(0, 19.5, 0);
+    baseLabel.position.set(3.8, 20.8, -2.4);
     baseStationGroup.add(baseLabel);
 
     // 设备机房 (小建筑)
@@ -2218,7 +2222,7 @@
     rebuiltBaseLabelDiv.textContent = '📡 岸边 5G 基站';
     rebuiltBaseLabelDiv.style.cssText = 'color:#fff;font-size:14px;font-weight:bold;background:rgba(0,0,0,0.7);padding:4px 10px;border-radius:12px;white-space:nowrap;';
     const rebuiltBaseLabel = new CSS2DObject(rebuiltBaseLabelDiv);
-    rebuiltBaseLabel.position.set(0, 20.4, 0);
+    rebuiltBaseLabel.position.set(4.2, 21.6, -2.8);
     baseStationGroup.add(rebuiltBaseLabel);
 
     const smallDish = new THREE.Mesh(new THREE.SphereGeometry(0.82, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), stationMaterials.white);
@@ -2369,6 +2373,8 @@
     const SEA_LEVEL = 0.5; // 海面基准高度 (ocean.position.y)
 
     const getDuctLayerOpacity = () => THREE.MathUtils.clamp(simulationControls.ductOpacity, 0, 0.35);
+    const getTrappedRayOpacity = () => THREE.MathUtils.clamp(simulationControls.trappedRayOpacity, 0.25, 1);
+    const getEscapeRayOpacity = () => THREE.MathUtils.clamp(simulationControls.escapeRayOpacity, 0.2, 1);
 
     const updateDuctVisualization = () => {
       // 清空旧射线
@@ -2552,7 +2558,7 @@
     rxLabelDiv.textContent = '📻 接收机';
     rxLabelDiv.style.cssText = 'color:#fff;font-size:12px;background:rgba(0,0,0,0.7);padding:2px 8px;border-radius:10px;white-space:nowrap;';
     const rxLabel = new CSS2DObject(rxLabelDiv);
-    rxLabel.position.set(0, 6.9, 0);
+    rxLabel.position.set(2.7, 6.2, -1.7);
     receiverGroup.add(rxLabel);
 
     // ============================================
@@ -2575,7 +2581,7 @@
     boatLabelDiv.textContent = '🚢 海上通信探测船';
     boatLabelDiv.style.cssText = 'color:#fff;font-size:13px;font-weight:bold;background:rgba(0,0,0,0.7);padding:3px 10px;border-radius:12px;white-space:nowrap;';
     const boatLabel = new CSS2DObject(boatLabelDiv);
-    boatLabel.position.set(-3.4, 4.2, 1.35);
+    boatLabel.position.set(-8.2, 5.9, 2.8);
     boatGroup.add(boatLabel);
 
     // ============================================
@@ -3255,6 +3261,16 @@
       // 从基站天线位置发射
       const origin = new THREE.Vector3(txAntennaLocalX, txAntennaLocalY, txAntennaLocalZ);
       baseStationGroup.localToWorld(origin);
+      const receiverTarget = new THREE.Vector3();
+      receiverGroup.getWorldPosition(receiverTarget);
+      const toReceiver = receiverTarget.clone().sub(origin);
+      const receiverAzimuth = Math.atan2(toReceiver.z, toReceiver.x);
+      const receiverRange = Math.max(40, Math.hypot(toReceiver.x, toReceiver.z));
+      const ductCeiling = SEA_LEVEL + Math.max(1, ductModel.ductHeight) - 1.0;
+      const rayOpacity = {
+        trapped: getTrappedRayOpacity(),
+        escape: getEscapeRayOpacity(),
+      };
 
       const createEscapeCurvePoints = (txOrigin, elev, azimuth) => {
         const pts = [];
@@ -3263,7 +3279,7 @@
         const dirZ = Math.sin(azimuth);
         const ductTopY = SEA_LEVEL + ductModel.ductHeight;
         const escapeBaseY = Math.max(txOrigin.y, ductTopY + 1.4);
-        const rangeMax = 54 + elev * 0.58;
+        const rangeMax = Math.min(160, Math.max(70, receiverRange * 0.48 + elev * 0.42));
         const nearDuctSag = Math.max(0, 8 - elev * 0.08);
         const escapeLift = 7 + elev * 0.18;
         for (let i = 0; i <= 72; i++) {
@@ -3295,15 +3311,60 @@
         escapeRayGroup.add(new THREE.Mesh(geo, mat));
       };
 
-      // 逃逸射线: 与黄色正弦线相同方位角扇面
-      const elevAngles = [50, 65, 80, 95, 110, 130];
+      const createTrappedCurvePoints = (txOrigin, rxTarget, laneOffset = 0) => {
+        const pts = [];
+        const forward = rxTarget.clone().sub(txOrigin);
+        forward.y = 0;
+        if (forward.lengthSq() < 0.001) forward.set(1, 0, 0);
+        forward.normalize();
+        const side = new THREE.Vector3(-forward.z, 0, forward.x);
+        const end = rxTarget.clone().add(side.clone().multiplyScalar(laneOffset * 0.28));
+        end.y = THREE.MathUtils.clamp(rxTarget.y + 0.5, SEA_LEVEL + 0.8, Math.max(SEA_LEVEL + 1.2, ductCeiling));
+        const startY = Math.min(txOrigin.y, Math.max(SEA_LEVEL + 2.2, ductCeiling - 1.2));
+        const endY = end.y;
+        const waveAmp = Math.max(0.8, Math.min(4.5, ductModel.ductHeight * 0.12));
+        for (let i = 0; i <= 96; i++) {
+          const t = i / 96;
+          const base = new THREE.Vector3().lerpVectors(txOrigin, end, t);
+          const lateral = Math.sin(t * Math.PI) * laneOffset;
+          const settle = THREE.MathUtils.smoothstep(t, 0, 1);
+          const yBase = THREE.MathUtils.lerp(startY, endY, settle);
+          const yWave = Math.sin(t * Math.PI * 4.6 + laneOffset * 0.25) * waveAmp;
+          const y = THREE.MathUtils.clamp(yBase + yWave, SEA_LEVEL + 0.45, Math.max(SEA_LEVEL + 1.0, ductCeiling));
+          pts.push(new THREE.Vector3(
+            base.x + side.x * lateral,
+            y,
+            base.z + side.z * lateral
+          ));
+        }
+        return pts;
+      };
+
+      // 逃逸射线: 以接收机方向为中心展开, 避免固定扇面偏离船体
+      const elevAngles = [50, 68, 88, 110, 132];
       const numAz = 7;
       const azAngles = [];
       for (let i = 0; i < numAz; i++) {
-        azAngles.push(-Math.PI * 0.35 + i * Math.PI * 0.12);
+        azAngles.push(receiverAzimuth + (i - (numAz - 1) / 2) * Math.PI * 0.07);
       }
 
       const hasDuct = ductModel.ductHeight > 0.5;
+      const trappedOffsets = [-5.4, -3.1, -1.2, 1.2, 3.1, 5.4];
+
+      if (hasDuct) {
+        trappedOffsets.forEach((offset, index) => {
+          const trappedPts = createTrappedCurvePoints(origin, receiverTarget, offset);
+          const curve = new THREE.CatmullRomCurve3(trappedPts);
+          const geo = new THREE.TubeGeometry(curve, 128, 0.075 + (index % 2) * 0.012, 7, false);
+          const mat = new THREE.MeshBasicMaterial({
+            color: 0xff8f00,
+            transparent: true,
+            opacity: rayOpacity.trapped,
+            depthTest: false,
+          });
+          trappedRayGroup.add(new THREE.Mesh(geo, mat));
+        });
+      }
 
       azAngles.forEach(azim => {
        elevAngles.forEach(elev => {
@@ -3312,27 +3373,15 @@
 
         let color, opacity;
         if (!hasDuct) {
-          color = 0x90caf9; opacity = 0.4;
+          color = 0x1976d2; opacity = Math.max(0.35, rayOpacity.escape * 0.75);
         } else if (r.trapped) {
-          color = 0xff6d00; opacity = 0.8;  // 🟠 陷获
+          color = 0xe65100; opacity = rayOpacity.trapped;  // 🟠 陷获
         } else {
-          color = 0x00e676; opacity = 0.75; // ⬜ 逃逸
+          color = 0x00a152; opacity = rayOpacity.escape; // ⬜ 逃逸
         }
 
-        if (r.trapped) {
-          const trappedCeiling = SEA_LEVEL + ductModel.ductHeight - 1.0;
-          const trappedPts = r.points.map(p => new THREE.Vector3(p.x, Math.min(p.y, trappedCeiling), p.z));
-          const curve = new THREE.CatmullRomCurve3(trappedPts);
-          const geo = new THREE.TubeGeometry(curve, Math.max(24, r.points.length * 2), 0.065, 6, false);
-          const mat = new THREE.MeshBasicMaterial({
-            color: 0xffc107,
-            transparent: true,
-            opacity: 0.92,
-            depthTest: true
-          });
-          trappedRayGroup.add(new THREE.Mesh(geo, mat));
-        } else {
-          addEscapeCurve(elev, azim, 0.52, 0.026, 0x66ff99);
+        if (!r.trapped) {
+          addEscapeCurve(elev, azim, rayOpacity.escape * 0.72, 0.032, 0x00a152);
         }
       });
       });
@@ -3413,7 +3462,7 @@
     // 图例标签
     const legendTrappedDiv = document.createElement('div');
     legendTrappedDiv.innerHTML = '🟠 陷获射线';
-    legendTrappedDiv.style.cssText = 'color:#ff6d00;font-size:11px;';
+    legendTrappedDiv.style.cssText = 'color:#ff8f00;font-size:11px;';
     const legendTrapped = new CSS2DObject(legendTrappedDiv);
     legendTrapped.position.set(30, 0.5 + ductModel.ductHeight * 0.5, 55);
     legendTrapped.name = 'legend-trapped';
@@ -3421,7 +3470,7 @@
 
     const legendEscapeDiv = document.createElement('div');
     legendEscapeDiv.innerHTML = '🔵 逃逸射线';
-    legendEscapeDiv.style.cssText = 'color:#64b5f6;font-size:11px;';
+    legendEscapeDiv.style.cssText = 'color:#00a152;font-size:11px;';
     const legendEscape = new CSS2DObject(legendEscapeDiv);
     legendEscape.position.set(30, 0.5 + ductModel.ductHeight * 2.5, 60);
     legendEscape.name = 'legend-escape';
@@ -3482,6 +3531,10 @@
       document.getElementById('duct-opacity-live-value').textContent = ductOpacityText;
       document.getElementById('ctrl-duct-opacity').value = simulationControls.ductOpacity;
       document.getElementById('ctrl-duct-opacity-live').value = simulationControls.ductOpacity;
+      document.getElementById('out-trapped-ray-opacity').textContent = simulationControls.trappedRayOpacity.toFixed(2);
+      document.getElementById('out-escape-ray-opacity').textContent = simulationControls.escapeRayOpacity.toFixed(2);
+      document.getElementById('ctrl-trapped-ray-opacity').value = simulationControls.trappedRayOpacity;
+      document.getElementById('ctrl-escape-ray-opacity').value = simulationControls.escapeRayOpacity;
 
       document.getElementById('bs-tx-power').textContent = `${baseStationConfig.txPower.toFixed(0)} dBm`;
       document.getElementById('bs-frequency').textContent = `${baseStationConfig.frequency.toFixed(0)} MHz`;
@@ -3598,6 +3651,8 @@
       const setDuctOpacity = value => { simulationControls.ductOpacity = value; };
       bindNumber('ctrl-duct-opacity', setDuctOpacity);
       bindNumber('ctrl-duct-opacity-live', setDuctOpacity);
+      bindNumber('ctrl-trapped-ray-opacity', value => { simulationControls.trappedRayOpacity = value; });
+      bindNumber('ctrl-escape-ray-opacity', value => { simulationControls.escapeRayOpacity = value; });
 
       document.getElementById('ctrl-boat-mode').addEventListener('change', (event) => {
         simulationControls.boatMode = event.target.value;
@@ -4002,6 +4057,7 @@
       // 更新通信链路 (每0.5秒)
       if (Math.floor(elapsed * 2) !== Math.floor((elapsed - dt) * 2)) {
         commLinkData = createCommLink();
+        updateRayFan();
       }
 
       // 更新信号脉冲沿通信链路运动
