@@ -4129,45 +4129,6 @@
     buoy2.scale.setScalar(0.8);
     scene.add(buoy2);
 
-    const createSeagull = (x, y, z) => {
-      const group = new THREE.Group();
-      const bodyGeo = new THREE.ConeGeometry(0.15, 0.6, 4);
-      const body = new THREE.Mesh(bodyGeo, new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        roughness: 0.3,
-      }));
-      body.rotation.x = Math.PI / 2;
-      group.add(body);
-
-      const wingGeo = new THREE.BoxGeometry(1.5, 0.03, 0.3);
-      const wing = new THREE.Mesh(wingGeo, new THREE.MeshStandardMaterial({
-        color: 0xf5f5f5,
-        roughness: 0.3,
-      }));
-      wing.position.y = 0.05;
-      group.add(wing);
-
-      group.position.set(x, y, z);
-      return group;
-    };
-
-    const seagulls = [];
-    for (let i = 0; i < 6; i++) {
-      const gull = createSeagull(
-        -30 + Math.random() * 80,
-        8 + Math.random() * 20,
-        -30 + Math.random() * 80
-      );
-      gull.userData = {
-        speed: 0.3 + Math.random() * 0.5,
-        radius: 3 + Math.random() * 8,
-        angle: Math.random() * Math.PI * 2,
-        heightOffset: Math.random() * Math.PI * 2,
-      };
-      scene.add(gull);
-      seagulls.push(gull);
-    }
-
     // ============================================
     // 11. 动画循环
     // ============================================
@@ -4308,15 +4269,6 @@
           pulse.position.copy(pt);
           pulse.material.opacity = 0.3 + Math.sin(t * Math.PI) * 0.5;
         }
-      });
-
-      // 海鸥动画
-      seagulls.forEach(gull => {
-        gull.userData.angle += gull.userData.speed * dt;
-        gull.position.x += Math.cos(gull.userData.angle) * gull.userData.speed * dt;
-        gull.position.z += Math.sin(gull.userData.angle) * gull.userData.speed * dt;
-        gull.position.y += Math.sin(elapsed * 2 + gull.userData.heightOffset) * 0.03;
-        gull.rotation.y = -gull.userData.angle + Math.PI / 2;
       });
 
       // 信标闪烁
