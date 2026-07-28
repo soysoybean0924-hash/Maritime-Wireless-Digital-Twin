@@ -3619,14 +3619,20 @@
         end.y = THREE.MathUtils.clamp(rxTarget.y + 0.5, SEA_LEVEL + 0.8, Math.max(SEA_LEVEL + 1.2, ductCeiling));
         const startY = Math.min(txOrigin.y, Math.max(SEA_LEVEL + 2.2, ductCeiling - 1.2));
         const endY = end.y;
-        const waveAmp = Math.max(0.8, Math.min(4.5, ductModel.ductHeight * 0.12));
-        for (let i = 0; i <= 96; i++) {
-          const t = i / 96;
+        const waveAmp = Math.max(0.8, ductModel.ductHeight * 0.32);
+        for (let i = 0; i <= 120; i++) {
+          const t = i / 120;
           const base = new THREE.Vector3().lerpVectors(txOrigin, end, t);
-          const settle = THREE.MathUtils.smoothstep(t, 0, 1);
+          const settle = 1 - Math.exp(-t * 7);
           const yBase = THREE.MathUtils.lerp(startY, endY, settle);
-          const yWave = Math.sin(t * Math.PI * 4.6) * waveAmp;
-          const y = THREE.MathUtils.clamp(yBase + yWave, SEA_LEVEL + 0.45, Math.max(SEA_LEVEL + 1.0, ductCeiling));
+          const ductCenter = SEA_LEVEL + ductModel.ductHeight * (0.48 + 0.04 * Math.cos(t * Math.PI * 2));
+          const guidedY = THREE.MathUtils.clamp(
+            ductCenter + Math.sin(t * Math.PI * 5.5) * waveAmp,
+            SEA_LEVEL + 0.45,
+            ductCeiling
+          );
+          const yWave = THREE.MathUtils.lerp(yBase, guidedY, settle);
+          const y = THREE.MathUtils.clamp(yWave, SEA_LEVEL + 0.45, Math.max(SEA_LEVEL + 1.0, ductCeiling));
           pts.push(new THREE.Vector3(
             base.x,
             y,
@@ -3636,62 +3642,6 @@
         pts[0].copy(txOrigin);
         pts[pts.length - 1].copy(end);
         return pts;
-      };
-
-      const sampleMainLinkPhase = (points) => {
-        const wavelength = propagationModel.c / (baseStationConfig.frequency * 1e6);
-        const k0 = (Math.PI * 2) / wavelength;
-        const samples = [];
-        let phase = 0;
-        let distance = 0;
-        const sampleStride = Math.max(2, Math.floor(points.length / 24));
-
-        for (let i = 0; i < points.length; i++) {
-          if (i > 0) {
-            const prev = points[i - 1];
-            const curr = points[i];
-            const segmentLength = prev.distanceTo(curr);
-            const midY = (prev.y + curr.y) * 0.5;
-            const heightRatio = THREE.MathUtils.clamp((midY - SEA_LEVEL) / Math.max(ductModel.ductHeight, 0.5), 0, 1);
-            const ductBendIndex = 1 + (1 - heightRatio) * Math.max(ductModel.ductStrength, 0) * 1e-6;
-            const seaReflectionPhase = midY < SEA_LEVEL + 1.1 ? Math.PI * 0.18 : 0;
-            phase += k0 * ductBendIndex * segmentLength + seaReflectionPhase;
-            distance += segmentLength;
-          }
-
-          if (i === 0 || i === points.length - 1 || i % sampleStride === 0) {
-            samples.push({
-              position: points[i],
-              phase,
-              distance,
-              inPhase: Math.cos(phase) >= 0,
-            });
-          }
-        }
-        return samples;
-      };
-
-      const addMainLinkPhaseMarkers = (points, opacity) => {
-        const markerGroup = new THREE.Group();
-        markerGroup.name = 'main-trapped-phase-markers';
-        const samples = sampleMainLinkPhase(points);
-        samples.forEach((sample, index) => {
-          const phaseStrength = (Math.cos(sample.phase) + 1) * 0.5;
-          const isLaunch = index === 0;
-          const radius = isLaunch ? 0.46 : 0.22 + phaseStrength * 0.18;
-          const markerGeo = new THREE.SphereGeometry(radius, 12, 8);
-          const markerMat = new THREE.MeshBasicMaterial({
-            color: isLaunch || sample.inPhase ? 0xfff3b0 : 0xb85000,
-            transparent: true,
-            opacity: Math.max(0.2, opacity * (isLaunch ? 1 : 0.38 + phaseStrength * 0.5)),
-            depthTest: false,
-          });
-          const marker = new THREE.Mesh(markerGeo, markerMat);
-          marker.position.copy(sample.position);
-          marker.name = isLaunch ? 'main-trapped-launch-same-phase' : 'main-trapped-accumulated-phase';
-          markerGroup.add(marker);
-        });
-        trappedRayGroup.add(markerGroup);
       };
 
       // 逃逸射线: 以接收机方向为中心展开, 避免固定扇面偏离船体
@@ -3709,15 +3659,14 @@
         const curve = new THREE.CatmullRomCurve3(trappedPts);
         const geo = new THREE.TubeGeometry(curve, 144, 0.12, 8, false);
         const mat = new THREE.MeshBasicMaterial({
-          color: 0xff8f00,
+          color: 0xffd54f,
           transparent: true,
-          opacity: rayOpacity.trapped,
+          opacity: Math.max(0.38, rayOpacity.trapped * 0.72),
           depthTest: false,
         });
         const mainTrappedLink = new THREE.Mesh(geo, mat);
         mainTrappedLink.name = 'main-trapped-link';
         trappedRayGroup.add(mainTrappedLink);
-        addMainLinkPhaseMarkers(trappedPts, rayOpacity.trapped);
 
         const victimTarget = new THREE.Vector3(0, 17.15, 0);
         victimTower.localToWorld(victimTarget);
@@ -3725,9 +3674,9 @@
         const victimCurve = new THREE.CatmullRomCurve3(victimPts);
         const victimGeo = new THREE.TubeGeometry(victimCurve, 160, 0.095, 8, false);
         const victimMat = new THREE.MeshBasicMaterial({
-          color: 0xff1744,
+          color: 0xffd54f,
           transparent: true,
-          opacity: Math.max(0.32, rayOpacity.trapped * 0.72),
+          opacity: Math.max(0.34, rayOpacity.trapped * 0.62),
           depthTest: false,
         });
         const victimInterferenceLink = new THREE.Mesh(victimGeo, victimMat);
