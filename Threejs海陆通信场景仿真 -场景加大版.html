@@ -138,6 +138,44 @@
     #bs-panel .param-label { color: #90a4ae; }
     #bs-panel .param-value { color: #e0e0e0; font-family: 'Consolas', monospace; }
 
+    #victim-alert-panel {
+      position: absolute;
+      top: 300px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.78);
+      color: #fff;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 82, 82, 0.28);
+      pointer-events: none;
+      backdrop-filter: blur(10px);
+      font-size: 12px;
+      max-width: 220px;
+      z-index: 3;
+    }
+    #victim-alert-panel h3 {
+      font-size: 14px;
+      color: #ff8a80;
+      margin: 0 0 8px 0;
+    }
+    #victim-alert-panel .alert-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 3px 0;
+    }
+    #victim-alert-panel .alert-label { color: #90a4ae; }
+    #victim-alert-panel .alert-value { color: #e0e0e0; font-family: 'Consolas', monospace; font-weight: 700; }
+    #victim-alert-panel.alerting {
+      border-color: rgba(255, 82, 82, 0.85);
+      box-shadow: 0 0 22px rgba(255, 82, 82, 0.22);
+      animation: victimPulse 1.1s ease-in-out infinite;
+    }
+    @keyframes victimPulse {
+      0%, 100% { box-shadow: 0 0 18px rgba(255, 82, 82, 0.16); }
+      50% { box-shadow: 0 0 32px rgba(255, 82, 82, 0.42); }
+    }
+
     /* 状态指示器 */
     .status-dot {
       display: inline-block;
@@ -483,7 +521,7 @@
 
   <!-- 基站工程参数面板 -->
   <div id="bs-panel">
-    <h3>🗼 基站工程参数</h3>
+    <h3>🗼 干扰基站参数</h3>
     <div class="param-row"><span class="param-label">发射功率</span><span class="param-value" id="bs-tx-power">43 dBm (20W)</span></div>
     <div class="param-row"><span class="param-label">频率</span><span class="param-value" id="bs-frequency">2600 MHz</span></div>
     <div class="param-row"><span class="param-label">带宽</span><span class="param-value">20 MHz</span></div>
@@ -498,6 +536,14 @@
       <div class="param-row"><span class="param-label">Rx 天线高度</span><span class="param-value" id="bs-rx-height">3 m</span></div>
       <div class="param-row"><span class="param-label">Rx 噪声系数</span><span class="param-value">5 dB</span></div>
     </div>
+  </div>
+
+  <div id="victim-alert-panel">
+    <h3>🚨 受扰基站警示</h3>
+    <div class="alert-row"><span class="alert-label">报警状态</span><span class="alert-value" id="victim-alert-state">未触发</span></div>
+    <div class="alert-row"><span class="alert-label">触发原因</span><span class="alert-value" id="victim-alert-reason">无波导</span></div>
+    <div class="alert-row"><span class="alert-label">跨海距离</span><span class="alert-value" id="victim-alert-distance">-- m</span></div>
+    <div class="alert-row"><span class="alert-label">风险等级</span><span class="alert-value" id="victim-alert-risk">低</span></div>
   </div>
 
   <div id="controls-hint">
@@ -2274,6 +2320,133 @@
     baseStationGroup.add(smallDish);
     addStationCylinder(new THREE.Vector3(-5.35, 0.45, -0.15), new THREE.Vector3(-5.35, 4.0, -0.15), 0.05, stationMaterials.steel);
     addStationMesh(new THREE.BoxGeometry(2.15, 2.35, 1.75), stationMaterials.white, new THREE.Vector3(-5.15, 1.78, 2.25));
+    rebuiltBaseLabelDiv.textContent = '📡 干扰基站';
+
+    const victimLandGroup = new THREE.Group();
+    victimLandGroup.position.set(205, 0, -50);
+    scene.add(victimLandGroup);
+
+    const victimLandMesh = new THREE.Mesh(landGeo.clone(), landMat.clone());
+    victimLandMesh.position.set(36, 2.0, 55);
+    victimLandMesh.rotation.y = Math.PI;
+    victimLandMesh.castShadow = true;
+    victimLandMesh.receiveShadow = true;
+    victimLandGroup.add(victimLandMesh);
+
+    const victimPad = new THREE.Mesh(
+      new THREE.CylinderGeometry(10, 14, 0.8, 48),
+      new THREE.MeshStandardMaterial({ color: 0x78a85d, roughness: 0.72, metalness: 0.02 })
+    );
+    victimPad.position.set(20.5, 1.0, -8);
+    victimPad.castShadow = true;
+    victimPad.receiveShadow = true;
+    victimLandGroup.add(victimPad);
+
+    const victimBeach = new THREE.Mesh(
+      new THREE.PlaneGeometry(22, 150),
+      new THREE.MeshStandardMaterial({ color: 0xe8d5a3, roughness: 0.72, metalness: 0 })
+    );
+    victimBeach.rotation.x = -Math.PI / 2;
+    victimBeach.position.set(-4, 0.08, 6);
+    victimBeach.receiveShadow = true;
+    victimLandGroup.add(victimBeach);
+
+    const victimBaseStationGroup = new THREE.Group();
+    victimBaseStationGroup.name = 'victim-base-station';
+    victimBaseStationGroup.position.set(20.5, 1.35, -8);
+    victimBaseStationGroup.rotation.y = Math.PI + 0.16;
+    victimBaseStationGroup.scale.setScalar(0.88);
+    victimLandGroup.add(victimBaseStationGroup);
+
+    const victimStationMaterials = {
+      ...stationMaterials,
+      blue: new THREE.MeshStandardMaterial({ color: 0x2d6cdf, roughness: 0.34, emissive: 0x0d3f9b, emissiveIntensity: 0.2 }),
+    };
+    const addVictimMesh = (geometry, material, position, rotation = null, parent = victimBaseStationGroup) =>
+      addStationMesh(geometry, material, position, rotation, parent);
+    const addVictimCylinder = (start, end, radius, material, parent = victimBaseStationGroup) =>
+      addStationCylinder(start, end, radius, material, parent);
+
+    addVictimMesh(new THREE.BoxGeometry(8.6, 0.5, 6.6), victimStationMaterials.pad, new THREE.Vector3(0, 0.25, 0));
+    addVictimMesh(new THREE.BoxGeometry(3.4, 4.6, 1.8), victimStationMaterials.white, new THREE.Vector3(2.15, 2.65, 0.34));
+    addVictimMesh(new THREE.BoxGeometry(2.35, 3.45, 0.14), victimStationMaterials.cabinetFace, new THREE.Vector3(2.15, 2.5, 1.32));
+    for (let i = 0; i < 5; i++) {
+      const y = 1.14 + i * 0.56;
+      addVictimMesh(new THREE.BoxGeometry(1.95, 0.24, 0.16), victimStationMaterials.steel, new THREE.Vector3(2.15, y, 1.48));
+      addVictimMesh(new THREE.BoxGeometry(0.28, 0.08, 0.04), victimStationMaterials.blue, new THREE.Vector3(1.55, y, 1.59));
+      addVictimMesh(new THREE.BoxGeometry(0.28, 0.08, 0.04), victimStationMaterials.blue, new THREE.Vector3(2.05, y, 1.59));
+      addVictimMesh(new THREE.BoxGeometry(0.28, 0.08, 0.04), victimStationMaterials.blue, new THREE.Vector3(2.55, y, 1.59));
+    }
+
+    const victimTower = new THREE.Group();
+    victimTower.position.set(-1.35, 0.52, -0.25);
+    victimBaseStationGroup.add(victimTower);
+    const victimLevels = [0, 2.8, 5.6, 8.4, 11.2, 14.0];
+    for (let i = 0; i < 4; i++) {
+      const sx = i < 2 ? -1.35 : 1.35;
+      const sz = i % 2 === 0 ? -1.15 : 1.15;
+      addVictimCylinder(new THREE.Vector3(sx, 0, sz), new THREE.Vector3(sx * 0.34, 14.0, sz * 0.34), 0.06, victimStationMaterials.steel, victimTower);
+    }
+    victimLevels.forEach(y => {
+      const t = y / 14;
+      const r = THREE.MathUtils.lerp(1.35, 0.46, t);
+      addVictimCylinder(new THREE.Vector3(-r, y, -r), new THREE.Vector3(r, y, -r), 0.035, victimStationMaterials.steel, victimTower);
+      addVictimCylinder(new THREE.Vector3(-r, y, r), new THREE.Vector3(r, y, r), 0.035, victimStationMaterials.steel, victimTower);
+      addVictimCylinder(new THREE.Vector3(-r, y, -r), new THREE.Vector3(-r, y, r), 0.035, victimStationMaterials.steel, victimTower);
+      addVictimCylinder(new THREE.Vector3(r, y, -r), new THREE.Vector3(r, y, r), 0.035, victimStationMaterials.steel, victimTower);
+    });
+    for (let i = 0; i < victimLevels.length - 1; i++) {
+      const y0 = victimLevels[i];
+      const y1 = victimLevels[i + 1];
+      const r0 = THREE.MathUtils.lerp(1.35, 0.46, y0 / 14);
+      const r1 = THREE.MathUtils.lerp(1.35, 0.46, y1 / 14);
+      addVictimCylinder(new THREE.Vector3(-r0, y0, -r0), new THREE.Vector3(r1, y1, -r1), 0.03, victimStationMaterials.steel, victimTower);
+      addVictimCylinder(new THREE.Vector3(r0, y0, r0), new THREE.Vector3(-r1, y1, r1), 0.03, victimStationMaterials.steel, victimTower);
+    }
+    addVictimMesh(new THREE.CylinderGeometry(0.08, 0.08, 3.0, 16), victimStationMaterials.steel, new THREE.Vector3(0, 15.45, 0), null, victimTower);
+
+    for (let i = 0; i < 4; i++) {
+      const angle = Math.PI + i * Math.PI * 0.22 - 0.33;
+      const panel = new THREE.Group();
+      panel.position.set(Math.cos(angle) * 1.75, 12.9 + (i % 2) * 0.55, Math.sin(angle) * 1.75);
+      panel.rotation.y = -angle + Math.PI / 2;
+      addVictimMesh(new THREE.BoxGeometry(0.54, 2.65, 0.16), victimStationMaterials.white, new THREE.Vector3(0, 0, 0), null, panel);
+      addVictimMesh(new THREE.BoxGeometry(0.32, 0.32, 0.04), victimStationMaterials.blue, new THREE.Vector3(0, 0.64, 0.12), null, panel);
+      victimTower.add(panel);
+    }
+
+    const victimBeaconMat = new THREE.MeshStandardMaterial({
+      color: 0x4fc3f7,
+      roughness: 0.2,
+      emissive: 0x0a5e91,
+      emissiveIntensity: 0.65,
+    });
+    addVictimMesh(new THREE.SphereGeometry(0.22, 18, 12), victimBeaconMat, new THREE.Vector3(0, 17.15, 0), null, victimTower);
+    const victimAlarmRingMat = new THREE.MeshBasicMaterial({
+      color: 0xff1744,
+      transparent: true,
+      opacity: 0,
+      depthTest: false,
+    });
+    const victimAlarmRing = new THREE.Mesh(new THREE.TorusGeometry(2.4, 0.055, 12, 80), victimAlarmRingMat);
+    victimAlarmRing.rotation.x = Math.PI / 2;
+    victimAlarmRing.position.set(0, 17.15, 0);
+    victimAlarmRing.name = 'victim-duct-interference-alarm-ring';
+    victimTower.add(victimAlarmRing);
+
+    const victimLabelDiv = document.createElement('div');
+    victimLabelDiv.textContent = '📶 受扰基站';
+    victimLabelDiv.style.cssText = 'color:#bbdefb;font-size:14px;font-weight:bold;background:rgba(0,0,0,0.72);padding:4px 10px;border-radius:12px;white-space:nowrap;border:1px solid rgba(144,202,249,0.55);';
+    const victimLabel = new CSS2DObject(victimLabelDiv);
+    victimLabel.position.set(4.0, 20.8, -2.2);
+    victimBaseStationGroup.add(victimLabel);
+
+    const victimWarningDiv = document.createElement('div');
+    victimWarningDiv.textContent = '波导干扰警报';
+    victimWarningDiv.style.cssText = 'display:none;color:#ff5252;font-size:13px;font-weight:bold;background:rgba(40,0,0,0.82);padding:4px 10px;border-radius:12px;white-space:nowrap;border:1px solid #ff5252;';
+    const victimWarningLabel = new CSS2DObject(victimWarningDiv);
+    victimWarningLabel.position.set(0, 24.2, 0);
+    victimBaseStationGroup.add(victimWarningLabel);
 
     // ============================================
     // 5. 海面
@@ -3545,6 +3718,21 @@
         mainTrappedLink.name = 'main-trapped-link';
         trappedRayGroup.add(mainTrappedLink);
         addMainLinkPhaseMarkers(trappedPts, rayOpacity.trapped);
+
+        const victimTarget = new THREE.Vector3(0, 17.15, 0);
+        victimTower.localToWorld(victimTarget);
+        const victimPts = createMainTrappedLinkPoints(origin, victimTarget);
+        const victimCurve = new THREE.CatmullRomCurve3(victimPts);
+        const victimGeo = new THREE.TubeGeometry(victimCurve, 160, 0.095, 8, false);
+        const victimMat = new THREE.MeshBasicMaterial({
+          color: 0xff1744,
+          transparent: true,
+          opacity: Math.max(0.32, rayOpacity.trapped * 0.72),
+          depthTest: false,
+        });
+        const victimInterferenceLink = new THREE.Mesh(victimGeo, victimMat);
+        victimInterferenceLink.name = 'duct-guided-cochannel-interference-link';
+        trappedRayGroup.add(victimInterferenceLink);
       }
 
       azAngles.forEach(azim => {
@@ -3941,157 +4129,6 @@
     buoy2.scale.setScalar(0.8);
     scene.add(buoy2);
 
-    // 低轨卫星：参考 img2threejs 风格，用组合几何表达箱体、太阳翼、抛物面天线与外露线束
-    const createLeoSatellite = () => {
-      const satellite = new THREE.Group();
-      satellite.name = 'img2threejs-style-leo-satellite';
-
-      const mat = {
-        body: new THREE.MeshStandardMaterial({ color: 0xd7dde3, roughness: 0.34, metalness: 0.62 }),
-        darkPanel: new THREE.MeshStandardMaterial({ color: 0x1a2a3d, roughness: 0.42, metalness: 0.35 }),
-        panel: new THREE.MeshStandardMaterial({ color: 0x123c74, roughness: 0.28, metalness: 0.5, emissive: 0x06244c, emissiveIntensity: 0.18 }),
-        gold: new THREE.MeshStandardMaterial({ color: 0xd8a838, roughness: 0.24, metalness: 0.58 }),
-        steel: new THREE.MeshStandardMaterial({ color: 0xb9c1c7, roughness: 0.22, metalness: 0.82 }),
-        cableBlue: new THREE.MeshStandardMaterial({ color: 0x0d7bdc, roughness: 0.35, metalness: 0.2 }),
-        cableGreen: new THREE.MeshStandardMaterial({ color: 0x5aa43a, roughness: 0.35, metalness: 0.2 }),
-        cableOrange: new THREE.MeshStandardMaterial({ color: 0xf4a12a, roughness: 0.35, metalness: 0.2 }),
-      };
-
-      const addBox = (size, position, material, rotation = [0, 0, 0]) => {
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
-        mesh.position.set(...position);
-        mesh.rotation.set(...rotation);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        satellite.add(mesh);
-        return mesh;
-      };
-
-      const addCylinder = (radiusTop, radiusBottom, height, position, material, rotation = [0, 0, 0], segments = 24) => {
-        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments), material);
-        mesh.position.set(...position);
-        mesh.rotation.set(...rotation);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        satellite.add(mesh);
-        return mesh;
-      };
-
-      const addLink = (from, to, radius, material) => {
-        const start = new THREE.Vector3(...from);
-        const end = new THREE.Vector3(...to);
-        const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-        const length = start.distanceTo(end);
-        const link = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, 10), material);
-        link.position.copy(mid);
-        link.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), end.clone().sub(start).normalize());
-        link.castShadow = true;
-        link.receiveShadow = true;
-        satellite.add(link);
-        return link;
-      };
-
-      addBox([3.0, 3.8, 2.3], [0, 0, 0], mat.body);
-      addBox([3.35, 0.16, 2.55], [0, 2.05, 0], mat.steel);
-      addCylinder(1.3, 1.3, 0.42, [0, -2.1, 0], mat.steel, [Math.PI / 2, 0, 0], 48);
-
-      const equipmentPositions = [
-        [-1.65, 0.95, 0.15], [-1.65, 0.1, -0.45], [-1.65, -0.8, 0.45],
-        [1.65, 0.7, -0.35], [1.65, -0.35, 0.5], [0, 0.2, 1.28],
-      ];
-      equipmentPositions.forEach((pos, index) => {
-        const size = index === 5 ? [1.55, 1.05, 0.18] : [0.58, 0.72, 0.2];
-        const rotation = index < 3 ? [0, 0, Math.PI / 2] : index < 5 ? [0, 0, Math.PI / 2] : [0, 0, 0];
-        addBox(size, pos, index === 5 ? mat.darkPanel : mat.body, rotation);
-      });
-
-      const dish = new THREE.Mesh(
-        new THREE.SphereGeometry(1.28, 48, 18, 0, Math.PI * 2, 0, Math.PI / 2),
-        new THREE.MeshStandardMaterial({
-          color: 0xe7ebef,
-          roughness: 0.18,
-          metalness: 0.72,
-          side: THREE.DoubleSide,
-        })
-      );
-      dish.position.set(-0.65, 2.92, 0.08);
-      dish.rotation.set(-0.88, 0.3, -0.18);
-      dish.scale.set(1.18, 1.18, 0.32);
-      dish.castShadow = true;
-      satellite.add(dish);
-      addCylinder(0.09, 0.09, 1.0, [-0.3, 2.45, 0.02], mat.steel, [0.7, 0, 0.25]);
-      addCylinder(0.18, 0.18, 1.0, [0.75, 2.75, 0.15], mat.steel);
-      addCylinder(0.38, 0.38, 0.58, [0.75, 3.55, 0.15], mat.body, [0, 0, 0], 32);
-
-      const buildSolarArray = (side) => {
-        const x = side * 4.9;
-        addLink([side * 1.5, 0.52, 0], [side * 3.15, 0.52, 0], 0.055, mat.steel);
-        addLink([side * 1.5, -0.52, 0], [side * 3.15, -0.52, 0], 0.055, mat.steel);
-        addLink([side * 2.0, -0.9, 0], [side * 3.4, 0.9, 0], 0.035, mat.steel);
-        addLink([side * 2.0, 0.9, 0], [side * 3.4, -0.9, 0], 0.035, mat.steel);
-
-        const panelGroup = new THREE.Group();
-        panelGroup.name = side < 0 ? 'left-solar-panel-array' : 'right-solar-panel-array';
-        panelGroup.position.set(x, 0, 0);
-        panelGroup.rotation.z = side < 0 ? 0.14 : -0.14;
-        satellite.add(panelGroup);
-
-        const frame = new THREE.Mesh(new THREE.BoxGeometry(3.2, 5.0, 0.12), mat.gold);
-        frame.castShadow = true;
-        frame.receiveShadow = true;
-        panelGroup.add(frame);
-
-        for (let ix = -1; ix <= 1; ix++) {
-          for (let iy = -2; iy <= 2; iy++) {
-            const cell = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.78, 0.16), mat.panel);
-            cell.position.set(ix * 0.98, iy * 0.86, 0.04);
-            cell.castShadow = true;
-            panelGroup.add(cell);
-          }
-        }
-
-        for (let i = -1; i <= 1; i++) {
-          const rib = new THREE.Mesh(new THREE.BoxGeometry(0.035, 5.18, 0.2), mat.gold);
-          rib.position.x = i * 1.05;
-          panelGroup.add(rib);
-        }
-        for (let i = -2; i <= 2; i++) {
-          const rib = new THREE.Mesh(new THREE.BoxGeometry(3.36, 0.035, 0.2), mat.gold);
-          rib.position.y = i * 0.9;
-          panelGroup.add(rib);
-        }
-      };
-
-      buildSolarArray(-1);
-      buildSolarArray(1);
-
-      [-0.75, 0, 0.75].forEach((x, index) => {
-        const cableMat = [mat.cableBlue, mat.cableGreen, mat.cableOrange][index];
-        addCylinder(0.045, 0.045, 3.3, [x, 0.05, 1.34], cableMat);
-        addCylinder(0.045, 0.045, 1.45, [x + 0.36, 1.45, 1.34], cableMat, [0, 0, Math.PI / 2]);
-      });
-
-      [[-1.25, 1.72, -0.65], [1.25, 1.72, -0.65], [-1.25, -1.72, -0.65], [1.25, -1.72, -0.65]].forEach(pos => {
-        addCylinder(0.12, 0.12, 0.42, pos, mat.steel, [Math.PI / 2, 0, 0], 20);
-      });
-
-      const labelDiv = document.createElement('div');
-      labelDiv.className = 'label';
-      labelDiv.innerHTML = '🛰️ 低轨卫星';
-      const label = new CSS2DObject(labelDiv);
-      label.position.set(0, 4.45, 0);
-      satellite.add(label);
-
-      satellite.position.set(18, 250, -34);
-      satellite.rotation.set(-0.22, 0.62, 0.12);
-      satellite.scale.setScalar(1.35);
-      return satellite;
-    };
-
-    const leoSatellite = createLeoSatellite();
-    scene.add(leoSatellite);
-
-    // 海鸥 (简化抽象)
     const createSeagull = (x, y, z) => {
       const group = new THREE.Group();
       const bodyGeo = new THREE.ConeGeometry(0.15, 0.6, 4);
@@ -4233,10 +4270,6 @@
       buoy.position.y = 1 + sampleWaveHeight(35 - 5, 15 - 5);
       buoy2.position.y = 1 + sampleWaveHeight(42 - 5, 28 - 5);
 
-      // 低轨卫星缓慢姿态变化，保持可识别的太阳翼和载荷舱轮廓
-      leoSatellite.rotation.y = 0.62 + Math.sin(elapsed * 0.16) * 0.05;
-      leoSatellite.rotation.z = 0.12 + Math.sin(elapsed * 0.11) * 0.025;
-
       // 更新通信链路 (每0.5秒)
       if (Math.floor(elapsed * 2) !== Math.floor((elapsed - dt) * 2)) {
         commLinkData = createCommLink();
@@ -4331,6 +4364,33 @@
 
       // 计算实际场景距离 (坐标系单位 ≈ 米)
       const signalResult = propagationModel.computeSignal(dist3D, dt);
+      const txBaseWorld = new THREE.Vector3();
+      const victimBaseWorld = new THREE.Vector3();
+      baseStationGroup.getWorldPosition(txBaseWorld);
+      victimBaseStationGroup.getWorldPosition(victimBaseWorld);
+      const victimInterferenceDistance = txBaseWorld.distanceTo(victimBaseWorld);
+      const ductInterferenceActive = ductModel.isTrapping && ductModel.ductHeight > 0.5;
+      const victimRisk = !ductInterferenceActive ? '低'
+        : ductModel.ductStrength > 9 || signalResult.ductGain > 8 ? '高'
+        : '中';
+      victimAlarmRing.visible = ductInterferenceActive;
+      victimAlarmRing.material.opacity = ductInterferenceActive ? 0.36 + 0.28 * Math.sin(elapsed * 5.5) : 0;
+      victimAlarmRing.scale.setScalar(ductInterferenceActive ? 1 + 0.14 * Math.sin(elapsed * 5.5) : 1);
+      victimBeaconMat.emissive.setHex(ductInterferenceActive ? 0xff0000 : 0x0a5e91);
+      victimBeaconMat.color.setHex(ductInterferenceActive ? 0xff1744 : 0x4fc3f7);
+      victimBeaconMat.emissiveIntensity = ductInterferenceActive ? 2.2 + 0.8 * Math.sin(elapsed * 7) : 0.65;
+      victimWarningDiv.style.display = ductInterferenceActive ? 'block' : 'none';
+      victimWarningDiv.textContent = ductInterferenceActive ? `波导同频干扰 ${victimRisk}风险` : '波导干扰未触发';
+
+      const victimAlertPanel = document.getElementById('victim-alert-panel');
+      victimAlertPanel.classList.toggle('alerting', ductInterferenceActive);
+      document.getElementById('victim-alert-state').textContent = ductInterferenceActive ? '报警' : '未触发';
+      document.getElementById('victim-alert-state').style.color = ductInterferenceActive ? '#ff5252' : '#8bc34a';
+      document.getElementById('victim-alert-reason').textContent = ductInterferenceActive ? '波导存在' : '无波导';
+      document.getElementById('victim-alert-distance').textContent = `${Math.round(victimInterferenceDistance)} m`;
+      document.getElementById('victim-alert-risk').textContent = victimRisk;
+      document.getElementById('victim-alert-risk').style.color =
+        victimRisk === '高' ? '#ff5252' : victimRisk === '中' ? '#ffb74d' : '#8bc34a';
 
       // 信号强度分级
       let signalLevel, signalClass;
