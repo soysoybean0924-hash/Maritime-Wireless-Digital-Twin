@@ -49,6 +49,28 @@ class ChannelModelTests(unittest.TestCase):
         self.assertFalse(result["interferenceAlarm"])
         self.assertEqual(result["interferenceRisk"], "low")
 
+    def test_environment_parameters_drive_duct_and_alarm_fields(self):
+        result = predict_channel(
+            {
+                "airTemp": 24,
+                "seaTemp": 30,
+                "rh": 88,
+                "windSpeed": 4,
+                "pressure": 1013.25,
+                "frequency": 2600,
+                "txPower": 43,
+                "txAntennaGain": 17,
+                "rxAntennaGain": 10,
+                "basePosition": {"x": -210.5, "y": 1.35, "z": -58},
+                "boatPosition": {"x": 25, "y": 1.2, "z": 20},
+                "victimBasePosition": {"x": 225.5, "y": 1.35, "z": -58},
+            }
+        )
+        self.assertTrue(result["ductExists"])
+        self.assertGreaterEqual(result["ductProbability"], 0.25)
+        self.assertIn("interferenceAlarm", result)
+        self.assertIn("interferencePowerDbm", result)
+
 
 class JsonShapeTests(unittest.TestCase):
     def test_payload_is_json_serializable(self):

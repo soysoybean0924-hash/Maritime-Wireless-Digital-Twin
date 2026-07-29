@@ -2869,6 +2869,7 @@
       lastAutoRequestAt: 0,
       latestPrediction: null,
       drivesDuctState: false,
+      ductExists: false,
     };
 
     const setPythonTwinStatus = (text, state = 'offline') => {
@@ -2890,6 +2891,7 @@
     const applyPythonTwinDuctState = (prediction) => {
       pythonTwin.latestPrediction = prediction;
       pythonTwin.drivesDuctState = true;
+      pythonTwin.ductExists = Boolean(prediction.ductExists);
       const h = THREE.MathUtils.clamp(Number(prediction.ductHeightM) || 0, 0, 35);
       ductModel.ductHeight = prediction.ductExists ? h : 0;
       ductModel.ductStrength = prediction.ductExists ? Math.max(0, Number(prediction.ductStrengthMUnits) || 0) : 0;
@@ -2900,6 +2902,13 @@
       updateDuctShell();
       updateRayFan();
       updateAnalysisCharts();
+    };
+
+    const isPythonDuctActive = () => {
+      if (pythonTwin.drivesDuctState && pythonTwin.latestPrediction) {
+        return pythonTwin.ductExists;
+      }
+      return ductModel.isTrapping && ductModel.ductHeight > 0.5;
     };
 
     const collectPythonTwinPayload = () => {
@@ -2959,6 +2968,7 @@
         applyPythonTwinDuctState(data.prediction);
       } catch (error) {
         pythonTwin.drivesDuctState = false;
+        pythonTwin.ductExists = false;
         setPythonTwinStatus('离线', 'offline');
       } finally {
         window.clearTimeout(timeoutId);
@@ -3678,7 +3688,7 @@
         azAngles.push(receiverAzimuth + (i - (numAz - 1) / 2) * Math.PI * 0.07);
       }
 
-      const hasDuct = ductModel.ductHeight > 0.5;
+      const hasDuct = isPythonDuctActive();
 
       if (hasDuct) {
         const trappedPts = createMainTrappedLinkPoints(origin, receiverTarget);
@@ -3770,7 +3780,7 @@
     rayFanGroup.add(ductRing3D);
 
     const updateDuctShell = () => {
-      const hasDuct = ductModel.isTrapping && ductModel.ductHeight > 0.5;
+      const hasDuct = isPythonDuctActive();
       const ductY = 0.5 + ductModel.ductHeight;
 
       // 标签
