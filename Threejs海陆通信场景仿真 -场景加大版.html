@@ -585,6 +585,7 @@
     <div class="python-row"><span class="python-label">路径损耗</span><span class="python-value" id="python-pathloss">-- dB</span></div>
     <div class="python-row"><span class="python-label">传播时延</span><span class="python-value" id="python-delay">-- μs</span></div>
     <div class="python-row"><span class="python-label">波导高度</span><span class="python-value" id="python-duct-height">-- m</span></div>
+    <div class="python-row"><span class="python-label">波导概率</span><span class="python-value" id="python-duct-probability">-- %</span></div>
     <div class="python-row"><span class="python-label">推理耗时</span><span class="python-value" id="python-inference">-- ms</span></div>
   </div>
   </div>
@@ -2866,6 +2867,8 @@
       pending: false,
       debounceTimer: null,
       lastAutoRequestAt: 0,
+      latestPrediction: null,
+      drivesDuctState: false,
     };
 
     const setPythonTwinStatus = (text, state = 'offline') => {
@@ -2878,17 +2881,36 @@
       document.getElementById('python-pathloss').textContent = `${prediction.pathLossDb.toFixed(2)} dB`;
       document.getElementById('python-delay').textContent = `${prediction.delayUs.toFixed(2)} μs`;
       document.getElementById('python-duct-height').textContent = `${prediction.ductHeightM.toFixed(1)} m`;
+      document.getElementById('python-duct-probability').textContent =
+        `${((prediction.ductProbability ?? 0) * 100).toFixed(0)} %`;
       document.getElementById('python-inference').textContent = `${prediction.inferenceMs.toFixed(2)} ms`;
       setPythonTwinStatus('已连接', 'online');
+    };
+
+    const applyPythonTwinDuctState = (prediction) => {
+      pythonTwin.latestPrediction = prediction;
+      pythonTwin.drivesDuctState = true;
+      const h = THREE.MathUtils.clamp(Number(prediction.ductHeightM) || 0, 0, 35);
+      ductModel.ductHeight = prediction.ductExists ? h : 0;
+      ductModel.ductStrength = prediction.ductExists ? Math.max(0, Number(prediction.ductStrengthMUnits) || 0) : 0;
+      ductModel.criticalFreq = prediction.criticalFreqMHz ? Number(prediction.criticalFreqMHz) : 0;
+      ductModel.isTrapping = Boolean(prediction.ductExists);
+      ductModel.trappingGain = Math.max(0, Number(prediction.ductGainDb) || 0);
+      updateDuctVisualization();
+      updateDuctShell();
+      updateRayFan();
+      updateAnalysisCharts();
     };
 
     const collectPythonTwinPayload = () => {
       const baseWorld = new THREE.Vector3();
       const boatWorld = new THREE.Vector3();
+      const victimWorld = new THREE.Vector3();
       const txWorld = new THREE.Vector3(txAntennaLocalX, txAntennaLocalY, txAntennaLocalZ);
       const rxWorld = new THREE.Vector3();
       baseStationGroup.getWorldPosition(baseWorld);
       boatGroup.getWorldPosition(boatWorld);
+      victimBaseStationGroup.getWorldPosition(victimWorld);
       baseStationGroup.localToWorld(txWorld);
       receiverGroup.getWorldPosition(rxWorld);
 
@@ -2906,11 +2928,13 @@
         rxCableLoss: baseStationConfig.rxCableLoss,
         txHeight: baseStationConfig.txHeight,
         rxHeight: baseStationConfig.rxHeight,
-        ductHeight: ductModel.ductHeight,
+        ductHeight: simulationControls.ductAuto ? null : ductModel.ductHeight,
         basePosition: { x: baseWorld.x, y: baseWorld.y, z: baseWorld.z },
         boatPosition: { x: boatWorld.x, y: boatWorld.y, z: boatWorld.z },
+        victimBasePosition: { x: victimWorld.x, y: victimWorld.y, z: victimWorld.z },
         txPosition: { x: txWorld.x, y: txWorld.y, z: txWorld.z },
         rxPosition: { x: rxWorld.x, y: rxWorld.y, z: rxWorld.z },
+        victimInterferenceThresholdDbm: -94,
         useInhomogeneous,
       };
     };
@@ -2932,7 +2956,9 @@
         const data = await response.json();
         if (!data.ok || !data.prediction) throw new Error(data.error || 'Invalid response');
         updatePythonTwinPanel(data.prediction);
+        applyPythonTwinDuctState(data.prediction);
       } catch (error) {
+        pythonTwin.drivesDuctState = false;
         setPythonTwinStatus('离线', 'offline');
       } finally {
         window.clearTimeout(timeoutId);
@@ -4270,10 +4296,19 @@
       baseStationGroup.getWorldPosition(txBaseWorld);
       victimBaseStationGroup.getWorldPosition(victimBaseWorld);
       const victimInterferenceDistance = txBaseWorld.distanceTo(victimBaseWorld);
-      const ductInterferenceActive = ductModel.isTrapping && ductModel.ductHeight > 0.5;
-      const victimRisk = !ductInterferenceActive ? '低'
-        : ductModel.ductStrength > 9 || signalResult.ductGain > 8 ? '高'
-        : '中';
+      const pythonPrediction = pythonTwin.drivesDuctState ? pythonTwin.latestPrediction : null;
+      const ductInterferenceActive = pythonPrediction
+        ? Boolean(pythonPrediction.interferenceAlarm)
+        : ductModel.isTrapping && ductModel.ductHeight > 0.5;
+      const victimRisk = pythonPrediction
+        ? ({ high: '高', medium: '中', low: '低' }[pythonPrediction.interferenceRisk] || '低')
+        : !ductInterferenceActive ? '低'
+          : ductModel.ductStrength > 9 || signalResult.ductGain > 8 ? '高'
+          : '中';
+      const victimAlertReason = pythonPrediction
+        ? (ductInterferenceActive ? 'Python判定波导干扰' : 'Python判定未超门限')
+        : (ductInterferenceActive ? '波导存在' : '无波导');
+      const victimPanelDistance = pythonPrediction?.victimDistanceM ?? victimInterferenceDistance;
       victimAlarmRing.visible = ductInterferenceActive;
       victimAlarmRing.material.opacity = ductInterferenceActive ? 0.36 + 0.28 * Math.sin(elapsed * 5.5) : 0;
       victimAlarmRing.scale.setScalar(ductInterferenceActive ? 1 + 0.14 * Math.sin(elapsed * 5.5) : 1);
@@ -4287,8 +4322,8 @@
       victimAlertPanel.classList.toggle('alerting', ductInterferenceActive);
       document.getElementById('victim-alert-state').textContent = ductInterferenceActive ? '报警' : '未触发';
       document.getElementById('victim-alert-state').style.color = ductInterferenceActive ? '#ff5252' : '#8bc34a';
-      document.getElementById('victim-alert-reason').textContent = ductInterferenceActive ? '波导存在' : '无波导';
-      document.getElementById('victim-alert-distance').textContent = `${Math.round(victimInterferenceDistance)} m`;
+      document.getElementById('victim-alert-reason').textContent = victimAlertReason;
+      document.getElementById('victim-alert-distance').textContent = `${Math.round(victimPanelDistance)} m`;
       document.getElementById('victim-alert-risk').textContent = victimRisk;
       document.getElementById('victim-alert-risk').style.color =
         victimRisk === '高' ? '#ff5252' : victimRisk === '中' ? '#ffb74d' : '#8bc34a';

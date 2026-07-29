@@ -24,12 +24,30 @@ class ChannelModelTests(unittest.TestCase):
         self.assertGreater(result["distanceM"], 200)
         self.assertGreater(result["pathLossDb"], 0)
         self.assertGreater(result["delayUs"], 0)
+        self.assertIn("ductExists", result)
+        self.assertIn("ductProbability", result)
+        self.assertIn("interferenceAlarm", result)
+        self.assertIn(result["interferenceRisk"], {"low", "medium", "high"})
         self.assertGreaterEqual(result["inferenceMs"], 0)
 
     def test_predict_channel_accepts_missing_payload_fields(self):
         result = predict_channel({})
         self.assertIn("pathLossDb", result)
         self.assertIn("ductHeightM", result)
+
+    def test_no_duct_environment_reports_low_interference_risk(self):
+        result = predict_channel(
+            {
+                "airTemp": 30,
+                "seaTemp": 24,
+                "rh": 50,
+                "windSpeed": 14,
+                "ductHeight": 0,
+            }
+        )
+        self.assertFalse(result["ductExists"])
+        self.assertFalse(result["interferenceAlarm"])
+        self.assertEqual(result["interferenceRisk"], "low")
 
 
 class JsonShapeTests(unittest.TestCase):

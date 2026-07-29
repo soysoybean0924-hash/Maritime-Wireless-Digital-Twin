@@ -279,21 +279,35 @@ A_duct = max(0.8, 0.32δ)
 
 ## 9. 波导同频干扰警示
 
-本次新增的对岸受扰基站报警规则为：
+当前对岸受扰基站报警由 Python 返回结果优先驱动：
 
 ```text
-alarm = ductModel.isTrapping && ductHeight > 0.5
+alarm = interferenceAlarm_from_python
+```
+
+Python 端先根据环境参数估计波导：
+
+```text
+ductExists = isTrapping && ductHeight > 0.5 && ductProbability >= 0.25
+```
+
+再估计干扰站到受扰站的等效接收干扰功率：
+
+```text
+P_interfere = EIRP - (PL_victim - G_duct) + G_rx - L_rx_cable
+margin = P_interfere - victimThreshold
+alarm = ductExists && margin >= -6 dB
 ```
 
 风险等级近似为：
 
 ```text
-high risk: ΔM > 9 或 G_duct > 8 dB
-medium risk: 有波导但未达到高风险条件
-low risk: 无波导
+high risk: alarm 且 margin >= 8 dB 或 ΔM >= 9
+medium risk: alarm 但未达到 high risk
+low risk: 未报警
 ```
 
-含义是：当蒸发波导存在时，干扰基站信号可能被波导带到更远海域或对岸基站方向，形成原本频率规划中未考虑到的同频干扰风险。
+当 Python 后端离线时，Three.js 保留前端 fallback：`ductModel.isTrapping && ductHeight > 0.5` 时显示波导干扰风险。含义是：当蒸发波导存在且干扰链路越过门限时，干扰基站信号可能被波导带到更远海域或对岸基站方向，形成原本频率规划中未考虑到的同频干扰风险。
 
 ## 10. 海面和船体运动可视化公式
 
