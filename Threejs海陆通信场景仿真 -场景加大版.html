@@ -657,7 +657,7 @@
           <label class="control-row"><span>显示透明度</span><input id="ctrl-duct-opacity" type="range" min="0" max="0.35" step="0.01" value="0.08"><output id="out-duct-opacity">0.08</output></label>
           <label class="control-row"><span>陷获射线透明度</span><input id="ctrl-trapped-ray-opacity" type="range" min="0.25" max="1" step="0.01" value="0.95"><output id="out-trapped-ray-opacity">0.95</output></label>
           <label class="control-row"><span>逃逸射线透明度</span><input id="ctrl-escape-ray-opacity" type="range" min="0.2" max="1" step="0.01" value="0.7"><output id="out-escape-ray-opacity">0.70</output></label>
-          <label class="toggle-row"><span>水平非均匀波导</span><input id="ctrl-inhomogeneous" type="checkbox"></label>
+          <label class="toggle-row"><span>水平非均匀波导</span><input id="ctrl-inhomogeneous" type="checkbox" checked></label>
           <button class="action-button" id="ctrl-recompute" type="button">重新计算信道</button>
         </div>
       </div>
@@ -3483,7 +3483,7 @@
     }
 
     const inhomogDuct = new HorizontallyInhomogeneousDuct(ductModel);
-    let useInhomogeneous = false;
+    let useInhomogeneous = true;
 
     // --- 9b.6 更新所有分析图表 ---
     const updateAnalysisCharts = () => {
