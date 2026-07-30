@@ -140,8 +140,8 @@
 
     #victim-alert-panel {
       position: absolute;
-      top: 400px;
-      right: 20px;
+      bottom: 72px;
+      left: 320px;
       background: rgba(0, 0, 0, 0.78);
       color: #fff;
       padding: 14px 16px;
@@ -150,7 +150,7 @@
       pointer-events: none;
       backdrop-filter: blur(10px);
       font-size: 12px;
-      max-width: 220px;
+      width: 230px;
       z-index: 3;
     }
     #victim-alert-panel h3 {
@@ -334,31 +334,6 @@
       font-size: 12px;
       margin-top: 10px;
     }
-    .analysis-explainer {
-      margin-top: 12px;
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-      color: #a9c1d2;
-      font-size: 12px;
-      line-height: 1.55;
-    }
-    .analysis-note {
-      border-left: 2px solid rgba(129, 212, 250, 0.38);
-      padding-left: 10px;
-      min-width: 0;
-    }
-    .analysis-note strong {
-      display: block;
-      color: #fff3c4;
-      font-size: 12px;
-      margin-bottom: 3px;
-    }
-    .analysis-note code {
-      color: #ffcc80;
-      font-family: 'Consolas', 'Courier New', monospace;
-      white-space: normal;
-    }
     #export-hint {
       position: absolute;
       bottom: 20px;
@@ -514,9 +489,6 @@
       .analysis-charts {
         grid-template-columns: 1fr;
       }
-      .analysis-explainer {
-        grid-template-columns: 1fr;
-      }
     }
     @media (max-width: 560px) {
       .control-row {
@@ -525,6 +497,10 @@
       .control-row output,
       .control-row .readout {
         text-align: left;
+      }
+      #victim-alert-panel {
+        left: 20px;
+        bottom: 230px;
       }
     }
   </style>
@@ -710,16 +686,6 @@
         <div class="analysis-footer">
           时延: <span id="delay-value" style="color:#ffcc80;">--</span> |
           均匀/非均匀: <span id="homog-status" style="color:#81d4fa;">均匀</span>
-        </div>
-        <div class="analysis-explainer">
-          <div class="analysis-note">
-            <strong>M剖面图怎么画</strong>
-            纵轴是高度 z，横轴是修正折射率 <code>M(z)=N(z)+z/R_e×10^6</code>。<code>N(z)</code> 由温度、气压、相对湿度计算，近海面湿度剖面用对数层插值；气温、海温、湿度、风速来自上方调节台，自动模式下随时间漂移。
-          </div>
-          <div class="analysis-note">
-            <strong>路径损耗图怎么画</strong>
-            曲线来自页面内置 PE 抛物方程求解器：按 <code>Δx=1 km</code>、<code>Δz=1 m</code> 推进电磁场，再在 Tx 高度、波导高度和 80 m 高度抽取场强 dB 曲线；基础链路监测另用自由空间/双线模型减去波导陷获增益。
-          </div>
         </div>
       </div>
     </div>
