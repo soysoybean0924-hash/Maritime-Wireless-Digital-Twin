@@ -140,29 +140,33 @@
 
     #victim-alert-panel {
       position: absolute;
-      top: 400px;
+      top: 395px;
+      bottom: 195px;
       right: 20px;
       background: rgba(0, 0, 0, 0.78);
       color: #fff;
-      padding: 12px 14px;
+      padding: 10px 12px;
       border-radius: 12px;
       border: 1px solid rgba(255, 82, 82, 0.28);
       pointer-events: none;
       backdrop-filter: blur(10px);
-      font-size: 11px;
+      font-size: 10px;
+      line-height: 1.25;
       width: 220px;
+      overflow: hidden;
       z-index: 3;
     }
     #victim-alert-panel h3 {
-      font-size: 14px;
+      font-size: 12px;
       color: #ff8a80;
-      margin: 0 0 8px 0;
+      margin: 0 0 5px 0;
     }
     #victim-alert-panel .alert-row {
       display: flex;
       justify-content: space-between;
       gap: 12px;
-      margin: 2px 0;
+      margin: 1px 0;
+      min-height: 13px;
     }
     #victim-alert-panel .alert-label { color: #90a4ae; }
     #victim-alert-panel .alert-value { color: #e0e0e0; font-family: 'Consolas', monospace; font-weight: 700; }
@@ -198,34 +202,38 @@
     /* 蒸发波导面板 */
     #duct-panel {
       position: absolute;
-      top: 435px;
+      top: 430px;
+      bottom: 255px;
       left: 20px;
       background: rgba(0, 0, 0, 0.75);
       color: #fff;
-      padding: 11px 14px;
+      padding: 9px 12px;
       border-radius: 12px;
       border: 1px solid rgba(255, 152, 0, 0.3);
       backdrop-filter: blur(10px);
-      font-size: 11px;
+      font-size: 10px;
+      line-height: 1.25;
       width: 280px;
+      overflow: hidden;
       z-index: 3;
       pointer-events: auto;
     }
     #duct-panel h3 {
-      font-size: 12px;
+      font-size: 11px;
       color: #ff9800;
-      margin: 0 0 5px 0;
+      margin: 0 0 4px 0;
     }
     #duct-panel .duct-row {
       display: flex;
       justify-content: space-between;
-      margin: 2px 0;
+      margin: 1px 0;
+      min-height: 13px;
     }
     #duct-panel .duct-label { color: #a0a0a0; }
     #duct-panel .duct-value { color: #ffcc80; font-family: 'Consolas', monospace; }
     #duct-panel .duct-control {
-      margin-top: 6px;
-      padding-top: 6px;
+      margin-top: 4px;
+      padding-top: 4px;
       border-top: 1px solid rgba(255, 152, 0, 0.22);
     }
     #duct-panel .duct-control label {
@@ -233,7 +241,7 @@
       justify-content: space-between;
       gap: 10px;
       color: #a0a0a0;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
     #duct-panel input[type="range"] {
       width: 100%;
@@ -499,14 +507,15 @@
         text-align: left;
       }
       #victim-alert-panel {
-        top: auto;
+        top: 380px;
         right: 20px;
-        bottom: 210px;
+        bottom: 195px;
+        width: 210px;
       }
       #duct-panel {
-        top: auto;
+        top: 420px;
+        bottom: 255px;
         left: 20px;
-        bottom: 230px;
         width: 260px;
       }
     }
