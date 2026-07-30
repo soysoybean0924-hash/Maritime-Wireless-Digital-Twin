@@ -166,6 +166,9 @@
     }
     #victim-alert-panel .alert-label { color: #90a4ae; }
     #victim-alert-panel .alert-value { color: #e0e0e0; font-family: 'Consolas', monospace; font-weight: 700; }
+    #victim-alert-panel .alert-value.ok { color: #8bc34a; }
+    #victim-alert-panel .alert-value.warn { color: #ffb74d; }
+    #victim-alert-panel .alert-value.bad { color: #ff5252; }
     #victim-alert-panel.alerting {
       border-color: rgba(255, 82, 82, 0.85);
       box-shadow: 0 0 22px rgba(255, 82, 82, 0.22);
@@ -331,6 +334,31 @@
       font-size: 12px;
       margin-top: 10px;
     }
+    .analysis-explainer {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      color: #a9c1d2;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .analysis-note {
+      border-left: 2px solid rgba(129, 212, 250, 0.38);
+      padding-left: 10px;
+      min-width: 0;
+    }
+    .analysis-note strong {
+      display: block;
+      color: #fff3c4;
+      font-size: 12px;
+      margin-bottom: 3px;
+    }
+    .analysis-note code {
+      color: #ffcc80;
+      font-family: 'Consolas', 'Courier New', monospace;
+      white-space: normal;
+    }
     #export-hint {
       position: absolute;
       bottom: 20px;
@@ -486,6 +514,9 @@
       .analysis-charts {
         grid-template-columns: 1fr;
       }
+      .analysis-explainer {
+        grid-template-columns: 1fr;
+      }
     }
     @media (max-width: 560px) {
       .control-row {
@@ -567,6 +598,13 @@
     <div class="alert-row"><span class="alert-label">触发原因</span><span class="alert-value" id="victim-alert-reason">无波导</span></div>
     <div class="alert-row"><span class="alert-label">跨海距离</span><span class="alert-value" id="victim-alert-distance">-- m</span></div>
     <div class="alert-row"><span class="alert-label">风险等级</span><span class="alert-value" id="victim-alert-risk">低</span></div>
+    <div style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;">
+      <div class="alert-row"><span class="alert-label">保护间隔</span><span class="alert-value" id="guard-interval-value">4.69 μs</span></div>
+      <div class="alert-row"><span class="alert-label">最大时延</span><span class="alert-value ok" id="delay-alert-value">-- μs</span></div>
+      <div class="alert-row"><span class="alert-label">时延警示</span><span class="alert-value ok" id="delay-alert-state">未越限</span></div>
+      <div class="alert-row"><span class="alert-label">损耗门限</span><span class="alert-value" id="pathloss-limit-value">140 dB</span></div>
+      <div class="alert-row"><span class="alert-label">损耗警示</span><span class="alert-value ok" id="pathloss-alert-state">未越限</span></div>
+    </div>
   </div>
 
   <div id="controls-hint">
@@ -672,6 +710,16 @@
         <div class="analysis-footer">
           时延: <span id="delay-value" style="color:#ffcc80;">--</span> |
           均匀/非均匀: <span id="homog-status" style="color:#81d4fa;">均匀</span>
+        </div>
+        <div class="analysis-explainer">
+          <div class="analysis-note">
+            <strong>M剖面图怎么画</strong>
+            纵轴是高度 z，横轴是修正折射率 <code>M(z)=N(z)+z/R_e×10^6</code>。<code>N(z)</code> 由温度、气压、相对湿度计算，近海面湿度剖面用对数层插值；气温、海温、湿度、风速来自上方调节台，自动模式下随时间漂移。
+          </div>
+          <div class="analysis-note">
+            <strong>路径损耗图怎么画</strong>
+            曲线来自页面内置 PE 抛物方程求解器：按 <code>Δx=1 km</code>、<code>Δz=1 m</code> 推进电磁场，再在 Tx 高度、波导高度和 80 m 高度抽取场强 dB 曲线；基础链路监测另用自由空间/双线模型减去波导陷获增益。
+          </div>
         </div>
       </div>
     </div>
@@ -1277,6 +1325,12 @@
       positionY: 1.6 + 17.5,
       positionZ: -22,
     };
+
+    const alertThresholds = {
+      guardIntervalUs: 4.69, // 15 kHz SCS normal CP 的典型有效保护间隔
+      pathLossDb: 140,
+    };
+
     let txAntennaLocalY = baseStationConfig.txHeight - 7.5;
     const txAntennaLocalX = 0;
     const txAntennaLocalZ = 0;
@@ -3410,6 +3464,48 @@
 
     const rayTracer = new SimpleRayTracer(ductModel, baseStationConfig);
 
+    const computeCurrentDelayInfo = () => {
+      const txWorld = new THREE.Vector3(txAntennaLocalX, txAntennaLocalY, txAntennaLocalZ);
+      baseStationGroup.localToWorld(txWorld);
+      const rxWorld = new THREE.Vector3();
+      receiverGroup.getWorldPosition(rxWorld);
+      return rayTracer.computeDelay(txWorld, rxWorld);
+    };
+
+    const setAlertTextState = (id, text, stateClass) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text;
+      el.className = `alert-value ${stateClass}`;
+    };
+
+    const updateTimingAndLossAlerts = (signalResult, delayInfo) => {
+      const delayExceeded = delayInfo.maxDelay_us > alertThresholds.guardIntervalUs;
+      const pathLossExceeded = signalResult.pathLoss > alertThresholds.pathLossDb;
+
+      document.getElementById('guard-interval-value').textContent =
+        `${alertThresholds.guardIntervalUs.toFixed(2)} μs`;
+      document.getElementById('pathloss-limit-value').textContent =
+        `${alertThresholds.pathLossDb.toFixed(0)} dB`;
+      setAlertTextState(
+        'delay-alert-value',
+        `${delayInfo.maxDelay_us.toFixed(2)} μs`,
+        delayExceeded ? 'bad' : 'ok'
+      );
+      setAlertTextState(
+        'delay-alert-state',
+        delayExceeded ? '超过保护间隔' : '未越限',
+        delayExceeded ? 'bad' : 'ok'
+      );
+      setAlertTextState(
+        'pathloss-alert-state',
+        pathLossExceeded ? `${signalResult.pathLoss.toFixed(0)} dB 越限` : '未越限',
+        pathLossExceeded ? 'bad' : 'ok'
+      );
+
+      return { delayExceeded, pathLossExceeded };
+    };
+
     // --- 9b.5 2D 非均匀折射率场 (一阶马尔可夫链) ---
     class HorizontallyInhomogeneousDuct {
       constructor(ductModel) {
@@ -3491,11 +3587,7 @@
       drawPathLossCurves();
 
       // 更新传播时延
-      const txWorld = new THREE.Vector3(txAntennaLocalX, txAntennaLocalY, txAntennaLocalZ);
-      baseStationGroup.localToWorld(txWorld);
-      const rxWorld = new THREE.Vector3();
-      receiverGroup.getWorldPosition(rxWorld);
-      const delayInfo = rayTracer.computeDelay(txWorld, rxWorld);
+      const delayInfo = computeCurrentDelayInfo();
       document.getElementById('delay-value').textContent =
         `${delayInfo.maxDelay_us.toFixed(2)} μs (最大) | ${delayInfo.directDelay_us.toFixed(2)} μs (直射)`;
       document.getElementById('homog-status').textContent = useInhomogeneous ? '非均匀 (马尔可夫链)' : '均匀';
@@ -4333,6 +4425,8 @@
 
       // 计算实际场景距离 (坐标系单位 ≈ 米)
       const signalResult = propagationModel.computeSignal(dist3D, dt);
+      const delayInfo = computeCurrentDelayInfo();
+      const thresholdAlerts = updateTimingAndLossAlerts(signalResult, delayInfo);
       const txBaseWorld = new THREE.Vector3();
       const victimBaseWorld = new THREE.Vector3();
       baseStationGroup.getWorldPosition(txBaseWorld);
@@ -4350,6 +4444,12 @@
       const victimAlertReason = pythonPrediction
         ? (ductInterferenceActive ? 'Python判定波导干扰' : 'Python判定未超门限')
         : (ductInterferenceActive ? '波导存在' : '无波导');
+      const panelAlertActive = ductInterferenceActive || thresholdAlerts.delayExceeded || thresholdAlerts.pathLossExceeded;
+      const alertReasons = [];
+      if (ductInterferenceActive) alertReasons.push(victimAlertReason);
+      if (thresholdAlerts.delayExceeded) alertReasons.push('时延超过保护间隔');
+      if (thresholdAlerts.pathLossExceeded) alertReasons.push('路径损耗越限');
+      const combinedAlertReason = alertReasons.length ? alertReasons.join(' / ') : victimAlertReason;
       const victimPanelDistance = pythonPrediction?.victimDistanceM ?? victimInterferenceDistance;
       victimAlarmRing.visible = ductInterferenceActive;
       victimAlarmRing.material.opacity = ductInterferenceActive ? 0.36 + 0.28 * Math.sin(elapsed * 5.5) : 0;
@@ -4361,10 +4461,10 @@
       victimWarningDiv.textContent = ductInterferenceActive ? `波导同频干扰 ${victimRisk}风险` : '波导干扰未触发';
 
       const victimAlertPanel = document.getElementById('victim-alert-panel');
-      victimAlertPanel.classList.toggle('alerting', ductInterferenceActive);
-      document.getElementById('victim-alert-state').textContent = ductInterferenceActive ? '报警' : '未触发';
-      document.getElementById('victim-alert-state').style.color = ductInterferenceActive ? '#ff5252' : '#8bc34a';
-      document.getElementById('victim-alert-reason').textContent = victimAlertReason;
+      victimAlertPanel.classList.toggle('alerting', panelAlertActive);
+      document.getElementById('victim-alert-state').textContent = panelAlertActive ? '报警' : '未触发';
+      document.getElementById('victim-alert-state').style.color = panelAlertActive ? '#ff5252' : '#8bc34a';
+      document.getElementById('victim-alert-reason').textContent = combinedAlertReason;
       document.getElementById('victim-alert-distance').textContent = `${Math.round(victimPanelDistance)} m`;
       document.getElementById('victim-alert-risk').textContent = victimRisk;
       document.getElementById('victim-alert-risk').style.color =
@@ -4384,6 +4484,8 @@
       document.getElementById('rsrq-value').textContent = `${signalResult.rsrq.toFixed(1)} dB`;
       document.getElementById('rsrq-value').className = `metric-value ${signalLevel}`;
       document.getElementById('pathloss-value').textContent = `${signalResult.pathLoss.toFixed(0)} dB`;
+      document.getElementById('pathloss-value').className =
+        `metric-value ${thresholdAlerts.pathLossExceeded ? 'bad' : 'good'}`;
       document.getElementById('distance-value').textContent = `${Math.round(signalResult.distance)} m`;
       document.getElementById('model-value').textContent = signalResult.modelName;
       document.getElementById('wave-height-value').textContent =
