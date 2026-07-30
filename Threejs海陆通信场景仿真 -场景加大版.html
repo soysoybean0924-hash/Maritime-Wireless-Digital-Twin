@@ -140,7 +140,7 @@
 
     #victim-alert-panel {
       position: absolute;
-      top: 400px;
+      top: 360px;
       right: 20px;
       background: rgba(0, 0, 0, 0.78);
       color: #fff;
@@ -271,9 +271,7 @@
     #env-panel .env-value { color: #e0e0e0; font-family: 'Consolas', monospace; }
 
     #python-twin-panel {
-      position: absolute;
-      bottom: 20px;
-      left: 20px;
+      position: static;
       background: rgba(0, 0, 0, 0.72);
       color: #fff;
       padding: 12px 15px;
@@ -282,7 +280,6 @@
       pointer-events: none;
       backdrop-filter: blur(10px);
       font-size: 11px;
-      min-width: 230px;
       z-index: 3;
     }
     #python-twin-panel h3 {
@@ -501,7 +498,7 @@
       #victim-alert-panel {
         top: auto;
         right: 20px;
-        bottom: 210px;
+        bottom: 240px;
       }
       #duct-panel {
         top: auto;
@@ -623,15 +620,6 @@
     <div class="env-row"><span class="env-label">ASTD</span><span class="env-value" id="env-astd">-3.0 °C</span></div>
   </div>
 
-  <div id="python-twin-panel">
-    <h3>Python 信道预测</h3>
-    <div class="python-row"><span class="python-label">接口状态</span><span class="python-value offline" id="python-twin-status">未连接</span></div>
-    <div class="python-row"><span class="python-label">路径损耗</span><span class="python-value" id="python-pathloss">-- dB</span></div>
-    <div class="python-row"><span class="python-label">传播时延</span><span class="python-value" id="python-delay">-- μs</span></div>
-    <div class="python-row"><span class="python-label">波导高度</span><span class="python-value" id="python-duct-height">-- m</span></div>
-    <div class="python-row"><span class="python-label">波导概率</span><span class="python-value" id="python-duct-probability">-- %</span></div>
-    <div class="python-row"><span class="python-label">推理耗时</span><span class="python-value" id="python-inference">-- ms</span></div>
-  </div>
   </div>
 
   <section id="tuning-panel" aria-label="仿真参数调节">
@@ -680,6 +668,16 @@
           <label class="control-row"><span>逃逸射线透明度</span><input id="ctrl-escape-ray-opacity" type="range" min="0.2" max="1" step="0.01" value="0.7"><output id="out-escape-ray-opacity">0.70</output></label>
           <label class="toggle-row"><span>水平非均匀波导</span><input id="ctrl-inhomogeneous" type="checkbox" checked></label>
           <button class="action-button" id="ctrl-recompute" type="button">重新计算信道</button>
+        </div>
+
+        <div class="control-card" id="python-twin-panel">
+          <h3>Python 信道预测</h3>
+          <div class="python-row"><span class="python-label">接口状态</span><span class="python-value offline" id="python-twin-status">未连接</span></div>
+          <div class="python-row"><span class="python-label">路径损耗</span><span class="python-value" id="python-pathloss">-- dB</span></div>
+          <div class="python-row"><span class="python-label">传播时延</span><span class="python-value" id="python-delay">-- μs</span></div>
+          <div class="python-row"><span class="python-label">波导高度</span><span class="python-value" id="python-duct-height">-- m</span></div>
+          <div class="python-row"><span class="python-label">波导概率</span><span class="python-value" id="python-duct-probability">-- %</span></div>
+          <div class="python-row"><span class="python-label">推理耗时</span><span class="python-value" id="python-inference">-- ms</span></div>
         </div>
       </div>
 
