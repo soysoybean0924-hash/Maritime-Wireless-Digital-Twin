@@ -52,15 +52,3 @@ http://localhost:8000/maritime-wireless-digital.html
 ├── 添加海面图片maritime-wireless-digital-twin.html          # 添加海面图片后的阶段版本
 ├── maritime-wireless-digital-twin-presentation-guide.md    # 项目展示与汇报说明
 ├── 射线轨迹图.png                                          # 传播/射线轨迹示意图
-└── v1.pdf                                                  # 项目相关参考或阶段材料
-```
-
-## 开发约定
-
-从首次初始化后，本项目唯一开发目录为：
-
-```text
-D:\GitHubProjects\Maritime-Wireless-Digital-Twin
-```
-
-桌面源目录 `C:\Users\sypxx\Desktop\海陆通信场景` 仅作为原始备份保留，不再继续修改。
